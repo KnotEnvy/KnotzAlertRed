@@ -92,12 +92,20 @@ export class Minimap {
     this.fogCtx.putImageData(this.fogImg, 0, 0);
     ctx.drawImage(this.fogCanvas, 0, 0, SIZE, SIZE);
 
+    // faint sector grid
+    ctx.fillStyle = 'rgba(160, 220, 240, 0.07)';
+    for (let i = 1; i < 8; i++) {
+      const g = Math.round((i * SIZE) / 8);
+      ctx.fillRect(g, 0, 1, SIZE);
+      ctx.fillRect(0, g, SIZE, 1);
+    }
+
     // structures
     for (const b of world.buildings) {
       if (!b.alive || !(b.visible || b.seen)) continue;
       const w = Math.max(3, b.w * 2 * s);
       const h = Math.max(3, b.h * 2 * s);
-      ctx.fillStyle = TEAM_COLORS[b.team].hex;
+      ctx.fillStyle = b.team === TEAM_PLAYER ? '#3a78ef' : TEAM_COLORS[b.team].hex;
       if (b.def.capturable) {
         ctx.save();
         ctx.translate(X(b.x), Y(b.z));
@@ -108,17 +116,20 @@ export class Minimap {
         ctx.strokeRect(-3.5, -3.5, 7, 7);
         ctx.restore();
       } else {
+        ctx.fillStyle = 'rgba(2, 5, 9, 0.85)';
+        ctx.fillRect(X(b.x) - w / 2 - 1, Y(b.z) - h / 2 - 1, w + 2, h + 2);
+        ctx.fillStyle = b.team === TEAM_PLAYER ? '#4f8cff' : TEAM_COLORS[b.team].hex;
         ctx.fillRect(X(b.x) - w / 2, Y(b.z) - h / 2, w, h);
       }
     }
     // units
     for (const u of world.units) {
       if (!u.alive || !u.visible) continue;
-      ctx.fillStyle = u.team === TEAM_PLAYER ? (u.hero ? '#ffffff' : '#7fc0ff') : u.hero ? '#ffe08a' : '#ff5b4a';
+      ctx.fillStyle = u.team === TEAM_PLAYER ? (u.hero ? '#ffffff' : '#8fd0ff') : u.hero ? '#ffc08a' : '#ff4d5c';
       const r = u.hero ? 3.2 : u.radius > 1 ? 2.2 : 1.6;
       ctx.fillRect(X(u.x) - r / 2, Y(u.z) - r / 2, r, r);
       if (u.hero) {
-        ctx.strokeStyle = u.team === TEAM_PLAYER ? '#2f8bff' : '#ff3d2e';
+        ctx.strokeStyle = u.team === TEAM_PLAYER ? '#42e6ef' : '#ff4d5c';
         ctx.lineWidth = 1;
         ctx.strokeRect(X(u.x) - 3, Y(u.z) - 3, 6, 6);
       }
@@ -144,8 +155,8 @@ export class Minimap {
 
     // camera frustum
     if (corners.every((c) => c)) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgba(220, 245, 250, 0.95)';
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
       corners.forEach((c, i) => {
         const px = Math.max(-20, Math.min(SIZE + 20, X(c!.x)));

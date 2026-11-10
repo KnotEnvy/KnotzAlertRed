@@ -12,7 +12,7 @@ const audio = new AudioManager();
 audio.settings.sfx = settings.sfx;
 audio.settings.music = settings.music;
 audio.settings.voice = settings.voice;
-const screens = new Screens(app);
+const screens = new Screens(app, audio);
 let game: Game | null = null;
 
 declare global {
@@ -35,7 +35,7 @@ async function start(cfg: GameConfig): Promise<void> {
   game?.dispose();
   game = null;
   window.__game = null;
-  screens.loading('Preparing…', 0);
+  screens.loading('Preparing…', 0, cfg);
   try {
     const g = new Game(app, cfg, settings, audio, screens, {
       onRestart: () => void start({ ...cfg, seed: Math.floor(Math.random() * 1e9) }),
@@ -54,7 +54,8 @@ async function start(cfg: GameConfig): Promise<void> {
     screens.hide();
     const box = document.createElement('div');
     box.className = 'fatal panel';
-    box.innerHTML = `<h2>Unable to start</h2><p>This game needs WebGL 2. ${String(err instanceof Error ? err.message : err)}</p>`;
+    box.innerHTML = `<div class="fatal-ico">!</div><h2>Unable to start</h2><p>This game needs a browser with WebGL 2 enabled.</p><code></code>`;
+    (box.querySelector('code') as HTMLElement).textContent = String(err instanceof Error ? err.message : err);
     const back = document.createElement('button');
     back.className = 'btn primary';
     back.textContent = 'Back to menu';

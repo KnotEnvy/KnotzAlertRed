@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "KnotZ: Alert Red \u2014 a 3D browser RTS built with Vite, TypeScript and Babylon.js",
+  "description": "KnotZ: Alert Red — a 3D browser RTS built with Vite, TypeScript and Babylon.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -17,7 +17,9 @@
     "showcase": "node scripts/showcase.mjs"
   },
   "dependencies": {
-    "@babylonjs/core": "^9.35.0"
+    "@babylonjs/core": "^9.35.0",
+    "@fontsource/barlow": "^5.3.0",
+    "@fontsource/chakra-petch": "^5.3.0"
   },
   "devDependencies": {
     "playwright": "^1.65.0",
