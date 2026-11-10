@@ -12,6 +12,7 @@
     "smoke": "node scripts/smoke.mjs",
     "simtest": "node scripts/simtest.mjs",
     "movetest": "node scripts/movetest.mjs",
+    "audio:render": "node scripts/audio-render.mjs",
     "verify": "node scripts/verify/input.mjs && node scripts/verify/hud.mjs && node scripts/verify/combat.mjs"
   },
   "dependencies": {
