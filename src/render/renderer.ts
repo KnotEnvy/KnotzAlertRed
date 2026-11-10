@@ -313,6 +313,7 @@ export class Renderer {
     cb.end();
 
     this.updateGhost(view.ghost);
+    this.terrain.update(this.time, this.cam.fwd);
     this.fx.update(dt, this.cam.right, this.cam.up, this.time);
     this.fogView.update(world.fog, dt);
     this.scene.render();
@@ -441,7 +442,9 @@ export class Renderer {
       if (!b.alive || !(b.visible || b.seen)) continue;
       const mb = this.buildingBatch(b.def.model, b.team);
       const y = world.groundY(b.x, b.z) + 0.3;
-      const rise = b.rise >= 1 ? 1 : Math.max(0.04, 1 - (1 - b.rise) * (1 - b.rise));
+      // under construction the structure is raised out of the ground rather than stretched
+      const rise = b.rise >= 1 ? 1 : 1 - (1 - b.rise) * (1 - b.rise);
+      const sunk = b.rise >= 1 ? 0 : (1 - rise) * (mb.model.height + 0.4);
       let r = 1;
       let g = 1;
       let bl = 1;
@@ -460,7 +463,7 @@ export class Renderer {
         g = 0.95;
         bl = 1.3;
       }
-      mb.body.push(b.x, y, b.z, 0, 1, rise, 1, r, g, bl);
+      mb.body.push(b.x, y - sunk, b.z, 0, 1, 1, 1, r, g, bl);
       if (b.rise >= 1) {
         for (const part of mb.parts) {
           const p = part.info.pivot;
@@ -491,11 +494,17 @@ export class Renderer {
       if (b.def.capturable) {
         const c = TEAM_COLORS[b.team].rgb;
         const rs = (b.radius + 6) * 2.27;
-        const a = 0.3 + Math.sin(this.time * 2 + b.id) * 0.1;
-        this.fx.markBatch.pushBasis(b.x, y, b.z, rs, 0, 0, 0, 0, rs, 0, 1, 0, c[0] * 1.5, c[1] * 1.5, c[2] * 1.5, a);
+        const a = 0.2 + Math.sin(this.time * 2 + b.id) * 0.07;
+        this.ring(b.x, y, b.z, rs, this.time * 0.15, c[0] * 1.5, c[1] * 1.5, c[2] * 1.5, a);
       }
-      if (b.rise < 1 && Math.random() < 0.35) {
-        this.fx.sparkle(b.x + (Math.random() - 0.5) * b.w * CELL, y + rise * b.height * 0.8, b.z + (Math.random() - 0.5) * b.h * CELL, [0.5, 0.85, 1], 1);
+      if (b.rise < 1) {
+        // welding sparks around the footprint, dust where the walls break the surface, a build ring
+        const ex = (Math.random() - 0.5) * b.w * CELL;
+        const ez = (Math.random() - 0.5) * b.h * CELL;
+        if (Math.random() < 0.4) this.fx.sparkle(b.x + ex, y + 0.4 + Math.random() * 1.2, b.z + ez, [0.5, 0.85, 1], 1);
+        if (Math.random() < 0.25) this.fx.dust(b.x + ex, y + 0.2, b.z + ez, this.theme.dirt[0], this.theme.dirt[1], this.theme.dirt[2]);
+        const rs = Math.max(b.w, b.h) * CELL * 1.45;
+        this.ring(b.x, y - 0.05, b.z, rs, -this.time * 0.8, 0.4, 1.3, 1.8, 0.5 + Math.sin(this.time * 6) * 0.2);
       }
     }
   }
@@ -549,9 +558,9 @@ export class Renderer {
         const k = Math.min(1, w.t / COLLAPSE);
         const sink = left < 4 ? (4 - left) * 0.3 : 0;
         if (k < 1) {
-          const drop = k * k;
+          const drop = k * k * (w.mb.model.height + 0.4);
           const tint = 0.75 - k * 0.5;
-          w.mb.body.push(info.x + (Math.random() - 0.5) * 0.18, w.y + 0.3 - drop * 1.2, info.z + (Math.random() - 0.5) * 0.18, 0, 1, 1 - drop * 0.92, 1, tint, tint * 0.95, tint * 0.9);
+          w.mb.body.push(info.x + (Math.random() - 0.5) * 0.22, w.y + 0.3 - drop, info.z + (Math.random() - 0.5) * 0.22, 0, 1, 1, 1, tint, tint * 0.95, tint * 0.9);
           if (Math.random() < dt * 30) {
             const a = Math.random() * Math.PI * 2;
             const d = Math.random();

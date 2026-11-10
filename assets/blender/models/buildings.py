@@ -573,11 +573,11 @@ def arc(m):
 @building('extractor', team=2)
 def extractor(m):
     """Aurium Extractor: a weathered pre-war pumping station. Derrick, nodding pump and a holding tank."""
-    rust = (0.42, 0.27, 0.18)
-    steel = (0.36, 0.37, 0.39)
+    rust = (0.6, 0.36, 0.22)
+    steel = (0.52, 0.54, 0.57)
     b = m.part('body')
-    b.prism(rect(5.7, 5.7, 0.6), 1.0, axis='z', at=(0, 0, -0.7), mat=(0.36, 0.34, 0.31), bevel=0.07)
-    b.prism(rect(4.9, 4.9, 0.5), 0.05, axis='z', at=(0, 0, 0.3), mat=(0.26, 0.25, 0.24))
+    b.prism(rect(5.7, 5.7, 0.6), 1.0, axis='z', at=(0, 0, -0.7), mat=(0.5, 0.47, 0.42), bevel=0.07)
+    b.prism(rect(4.9, 4.9, 0.5), 0.05, axis='z', at=(0, 0, 0.3), mat=(0.36, 0.34, 0.32))
     # holding tank, back-left
     b.lathe([(1.35, 0.3), (1.35, 2.3), (1.1, 2.75), (0.4, 2.95), (0.0, 2.96)], at=(-1.3, 1.3, 0), seg=10, mat=steel)
     b.ring(1.4, 1.3, 0.34, at=(-1.3, 1.3, 1.9), seg=10, mat='team')
@@ -614,8 +614,8 @@ def extractor(m):
 @building('obelisk', team=2)
 def obelisk(m):
     """Signal Obelisk: an ancient relay. Stepped plinth, a needle cut with glowing bands, a hovering focus crystal."""
-    stone = (0.36, 0.37, 0.44)
-    stone2 = (0.25, 0.26, 0.32)
+    stone = (0.5, 0.52, 0.62)
+    stone2 = (0.36, 0.38, 0.47)
     b = m.part('body')
     b.prism(rect(3.9, 3.9, 0.6), 1.0, axis='z', at=(0, 0, -0.7), mat=stone2, bevel=0.06)
     b.prism(rect(3.2, 3.2, 0.5), 0.6, axis='z', at=(0, 0, 0.3), mat=stone, bevel=0.06)

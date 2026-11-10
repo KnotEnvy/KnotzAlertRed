@@ -1,4 +1,4 @@
-import { Color3, Mesh, MeshBuilder, StandardMaterial, VertexData } from './babylon';
+import { Color3, DirectionalLight, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } from './babylon';
 import type { Scene } from './babylon';
 import { GRID, WORLD } from '../core/config';
 import type { ThemeId } from '../core/config';
@@ -59,6 +59,7 @@ export class TerrainView {
   readonly ground: Mesh;
   readonly water: Mesh;
   readonly propBatches: Batch[] = [];
+  private glint: DirectionalLight;
   /** Pre-rendered top-down image of the terrain for the minimap. */
   readonly minimapImage: HTMLCanvasElement;
 
@@ -155,7 +156,7 @@ export class TerrainView {
       }
       // per-facet tone variation is what gives the ground its low-poly sparkle
       const tone = 0.9 + hash(a, seed, 3) * 0.2;
-      const steep = 1 - Math.min(0.45, (1 - Math.abs(ny)) * 1.6);
+      const steep = 1 - Math.min(0.25, (1 - Math.abs(ny)) * 0.9);
       const out = Math.max(0, -mx, -mz, mx - WORLD, mz - WORLD);
       const dim = tone * steep * (out > 0 ? Math.max(0.5, 1 - out / 40) : 1);
       const flip = ny < 0;
@@ -211,11 +212,16 @@ export class TerrainView {
     this.water = MeshBuilder.CreateGround('water', { width: WORLD + 104, height: WORLD + 104 }, scene);
     this.water.position.set(WORLD / 2, -0.55, WORLD / 2);
     const wm = new StandardMaterial('waterMat', scene);
-    wm.diffuseColor = new Color3(theme.water[0], theme.water[1], theme.water[2]);
-    wm.emissiveColor = new Color3(theme.water[0] * 0.25, theme.water[1] * 0.25, theme.water[2] * 0.25);
-    wm.specularColor = new Color3(0.9, 0.9, 0.9);
-    wm.specularPower = 90;
-    wm.alpha = 0.86;
+    wm.diffuseColor = new Color3(theme.water[0] * 1.5, theme.water[1] * 1.5, theme.water[2] * 1.5);
+    wm.emissiveColor = new Color3(theme.water[0] * 0.3, theme.water[1] * 0.3, theme.water[2] * 0.3);
+    wm.specularColor = new Color3(1, 1, 1);
+    wm.specularPower = 56;
+    wm.alpha = 0.72;
+    // A specular-only light aimed so the sun glints toward the camera, whichever way it faces.
+    this.glint = new DirectionalLight('glint', new Vector3(0, -0.7, -0.7), scene);
+    this.glint.diffuse = new Color3(0, 0, 0);
+    this.glint.specular = new Color3(0.5, 0.56, 0.62);
+    this.glint.includedOnlyMeshes = [this.water];
     this.water.material = wm;
     this.water.isPickable = false;
     this.water.alphaIndex = 0;
@@ -231,9 +237,9 @@ export class TerrainView {
       cap: theme.snow ? snow : mix(theme.leaf2, [1, 0.95, 0.5], 0.22),
     };
     const stone = {
-      rock: theme.rock,
-      rock2: mix(theme.rock, [0, 0, 0], 0.22),
-      cap: theme.snow ? snow : mix(theme.rock, theme.grass, 0.55),
+      rock: mix(theme.rock, [1, 1, 1], 0.18),
+      rock2: theme.rock,
+      cap: theme.snow ? snow : mix(theme.rock, theme.grass, 0.3),
     };
     const make = (name: string, overrides: Record<string, Col>, cap: number) => {
       const b = new Batch(buildModel(scene, pack, name, 0, overrides).body, cap);
@@ -255,7 +261,7 @@ export class TerrainView {
         const tint = 0.84 + frac(p.rot * 5) * 0.32;
         // conifers come in two shapes; broadleaf trees fill in the rest
         const kind = p.variant % 2 === 1 ? 1 : frac(p.rot * 13) < 0.4 ? 2 : 0;
-        const s = p.scale * (kind === 1 ? 0.95 : 0.9);
+        const s = p.scale * (kind === 1 ? 0.8 : 0.82);
         trees[kind].push(p.x, y - 0.1, p.z, p.rot, s, s * (0.9 + frac(p.rot * 11) * 0.3), s, tint, tint, tint);
       } else {
         bush.push(p.x, y - 0.05, p.z, p.rot, p.scale, p.scale, p.scale);
@@ -267,6 +273,11 @@ export class TerrainView {
     }
 
     this.minimapImage = this.renderMinimap(map, theme);
+  }
+
+  /** Keep the water's sheen facing the camera, with a slow swell so it never sits still. */
+  update(time: number, camFwd: readonly [number, number, number]): void {
+    this.glint.direction.set(-camFwd[0] + Math.sin(time * 0.6) * 0.08, camFwd[1] * 0.75, -camFwd[2] + Math.cos(time * 0.45) * 0.08);
   }
 
   private renderMinimap(map: GameMap, theme: Theme): HTMLCanvasElement {

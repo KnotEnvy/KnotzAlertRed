@@ -4,9 +4,9 @@ A 3D real-time strategy game that runs in the browser. Build a base from a sideb
 Aurium, mass tanks, lead a hero commander with levelling abilities, capture outposts, call
 orbital support — and tear down the Crimson Dominion's base before it tears down yours.
 
-Built with **Vite + TypeScript + Babylon.js**. Every model, texture, icon, sound effect and
-the soundtrack is generated procedurally at runtime; the only image asset is the main-menu
-key art in `public/art/`.
+Built with **Vite + TypeScript + Babylon.js**. The 3D models are built in Blender from Python
+scripts kept in `assets/` (see [assets/README.md](assets/README.md)), every sound effect and
+the soundtrack is synthesised at runtime, and the 2D art in `public/art/` is original.
 
 ## Run it
 
@@ -21,6 +21,8 @@ Other scripts:
 | --- | --- |
 | `npm run build` | Type-check and produce a production bundle in `dist/` |
 | `npm run typecheck` | `tsc --noEmit` with strict settings |
+| `npm run assets` | Rebuild the model pack and HUD portraits in headless Blender (`BLENDER=/path/to/blender` if it is not found) |
+| `npm run showcase` | Art review: lines up every unit and structure and writes close-up screenshots to `scripts/out/` (`THEME=frost` etc.); `node scripts/battleshot.mjs` stages a battle |
 | `npm run simtest` | Headless simulation soak: the AI plays a scripted opponent, no rendering |
 | `npm run movetest` | Marches a mixed group across ten generated maps and reports arrivals (pathfinding regression check) |
 | `npm run smoke` | Quick headless-browser pass through the menu, HUD, queues, commands, abilities, powers, combat and the results screens. `SHOTS=1` writes screenshots to `scripts/out/`, `PREVIEW=1` tests the production bundle |
@@ -78,19 +80,21 @@ src/
     ai.ts           the skirmish opponent
     map.ts          procedural map generation
     hooks.ts        the interface the sim uses to request sounds / effects / notices
-  render/   Babylon.js scene: procedural models, terrain, thin-instance batches, particles,
-            fog sheet, 2D overlay, portrait renderer
+  render/   Babylon.js scene: model-pack loader, faceted terrain, thin-instance batches,
+            particles and debris, wrecks, fog sheet, 2D overlay
   input/    mouse + keyboard: selection, context commands, placement and targeting modes
   ui/       DOM HUD, minimap, menus
   audio/    synthesised effects, generative music, announcer
   game.ts   wires one match together; main.ts handles menu ↔ match flow
-scripts/    headless test harnesses
+assets/     Blender modelling kit and model sources (Python) — the art pipeline
+public/     models/models.kzm (built model pack), art/ (key art, portraits, backdrops)
+scripts/    headless test harnesses and art-review screenshot tools
 ```
 
 The simulation only talks to presentation through `sim/hooks.ts`, so it can run without a
 browser (see `scripts/simtest.mjs`). The renderer is stateless with respect to entities: each
-frame it rebuilds thin-instance buffers straight from simulation state, so a unit type costs
-one draw call regardless of how many are on screen.
+frame it rebuilds thin-instance buffers straight from simulation state, so each part of a
+unit type (hull, turret, barrel…) costs one draw call regardless of how many are on screen.
 
 For automation, a running match is exposed as `window.__game` and
 `?autostart=1&hero=nyx&difficulty=hard&theme=frost&seed=42` skips the menu.

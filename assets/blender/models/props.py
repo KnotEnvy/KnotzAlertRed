@@ -6,7 +6,8 @@ from kz.registry import model
 
 
 def prop(name, **kw):
-    kw.setdefault('ao_dist', 2.2)
+    kw.setdefault('ao_dist', 1.3)
+    kw.setdefault('ao_strength', 0.5)
     return model(name, kind='prop', **kw)
 
 
