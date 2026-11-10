@@ -6,7 +6,8 @@ export type NoticeKind = 'info' | 'good' | 'warn' | 'bad';
 export type Rgb = readonly [number, number, number];
 
 export interface Hooks {
-  sound(id: string, x?: number, z?: number, vol?: number): void;
+  /** `team` (optional) is the team that caused the sound, so the mixer can favour the player's own units. */
+  sound(id: string, x?: number, z?: number, vol?: number, team?: number): void;
   voice(line: string): void;
   notify(text: string, kind: NoticeKind, x?: number, z?: number): void;
   ping(x: number, z: number, color: string): void;

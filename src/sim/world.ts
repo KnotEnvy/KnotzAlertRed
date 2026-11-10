@@ -373,6 +373,7 @@ export class World {
     } else if (prev === TEAM_PLAYER) {
       this.hooks.notify(`${b.def.name} lost to the enemy`, 'bad', b.x, b.z);
       this.hooks.voice('Outpost lost');
+      this.hooks.sound('capture_lost', b.x, b.z);
     } else if (b.seen) {
       this.hooks.notify(`Enemy captured the ${b.def.name}`, 'warn', b.x, b.z);
     }
@@ -384,7 +385,7 @@ export class World {
     const ty = this.groundY(t.x, t.z) + t.alt + t.height * 0.5;
     const big = wpn.damage >= 60;
     if (wpn.projectile !== 'arc') this.hooks.muzzle(mx, my, mz, yaw, big ? 1.5 : wpn.damage >= 30 ? 1 : 0.55);
-    this.hooks.sound(wpn.sfx, mx, mz);
+    this.hooks.sound(wpn.sfx, mx, mz, undefined, src.team);
     switch (wpn.projectile) {
       case 'bullet': {
         const j = t.radius * 0.35;
@@ -553,7 +554,7 @@ export class World {
         this.hooks.explosion(b.x + (Math.random() - 0.5) * span * 1.4, gy + Math.random() * b.height * 0.7, b.z + (Math.random() - 0.5) * span * 1.4, span * 0.5);
       }
       this.hooks.scorch(b.x, b.z, span * 1.5);
-      this.hooks.sound('explosion_l', b.x, b.z, 1.2);
+      this.hooks.sound('collapse', b.x, b.z, 1.2);
       this.hooks.shake(b.x, b.z, 1);
       if (b.team === TEAM_PLAYER) {
         this.hooks.notify(`${b.def.name} destroyed`, 'bad', b.x, b.z);
@@ -638,6 +639,7 @@ export class World {
     const why = this.queueBlock(team, kind, defId);
     if (why) return why;
     this.players[team].queues[kind].items.push({ defId, paid: 0, progress: 0 });
+    if (team === TEAM_PLAYER) this.hooks.sound('build_start');
     return '';
   }
 
@@ -710,6 +712,7 @@ export class World {
         this.hooks.sound('powerdown');
       } else {
         this.hooks.notify('Power restored', 'good');
+        this.hooks.sound('powerup');
       }
     }
     const reqRate = p.has('obelisk') ? 1.8 : 1;
@@ -732,7 +735,7 @@ export class World {
           if (p.team === TEAM_PLAYER) {
             this.hooks.notify(`${h.name} has returned to the fight`, 'good', h.x, h.z);
             this.hooks.voice('Hero ready');
-            this.hooks.sound('levelup');
+            this.hooks.sound('hero_ready');
           }
         } else {
           p.heroRespawn = 5;
@@ -796,7 +799,7 @@ export class World {
       if (mine) {
         this.hooks.notify(`Research complete: ${UPGRADE_DEFS[defId].name}`, 'good');
         this.hooks.voice('Research complete');
-        this.hooks.sound('ready');
+        this.hooks.sound('upgrade');
       }
       return;
     }

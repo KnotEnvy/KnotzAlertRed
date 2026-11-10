@@ -29,6 +29,7 @@ function showMenu(): void {
   game = null;
   window.__game = null;
   screens.mainMenu(settings, (cfg) => void start(cfg), () => audio.unlock());
+  audio.startMusic('menu');
 }
 
 async function start(cfg: GameConfig): Promise<void> {
@@ -76,8 +77,11 @@ window.__startGame = (cfg) =>
   });
 
 // `?autostart=1&hero=nyx&difficulty=easy&theme=frost&seed=42` skips the menu (used by the smoke test).
+// `?soundboard=1` opens the standalone sound test page instead of the game.
 const params = new URLSearchParams(location.search);
-if (params.get('autostart')) {
+if (params.get('soundboard')) {
+  void import('./audio/soundboard').then((m) => m.mountSoundboard(app, audio, settings));
+} else if (params.get('autostart')) {
   void window.__startGame({
     hero: params.get('hero') ?? undefined,
     difficulty: (params.get('difficulty') as Difficulty | null) ?? undefined,

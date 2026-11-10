@@ -234,7 +234,7 @@ export class Unit extends Entity {
         this.alt = base;
         w.hooks.explosion(this.x, w.groundY(this.x, this.z) + 0.3, this.z, 1.2);
         w.hooks.ring(this.x, this.z, 4, [1, 0.8, 0.4], 0.5);
-        w.hooks.sound('thump', this.x, this.z);
+        w.hooks.sound('drop_land', this.x, this.z, 1, this.team);
       }
       return;
     }
