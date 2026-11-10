@@ -13,6 +13,7 @@ import { ResourceNode } from '../sim/entity';
 import type { NoticeKind } from '../sim/hooks';
 import { Unit, makeOrder } from '../sim/unit';
 import type { World } from '../sim/world';
+import { CURSORS } from '../ui/cursors';
 
 export type Targeting = { type: 'attackMove' } | { type: 'ability'; index: number } | { type: 'power'; id: string };
 
@@ -712,9 +713,26 @@ export class Input {
     return { selection: this.selection, ghost, reticle };
   }
 
+  /** CSS cursor for the battlefield canvas (re-evaluated at most every ~80 ms). */
   cursor(): string {
-    if (this.placing) return 'cell';
-    if (this.targeting) return 'crosshair';
-    return 'default';
+    const memo = this as unknown as { cursorMemo?: { t: number; v: string } };
+    const now = performance.now();
+    if (memo.cursorMemo && now - memo.cursorMemo.t < 80) return memo.cursorMemo.v;
+    let v = CURSORS.default;
+    if (this.placing) {
+      const c = this.ghostCell();
+      const def = BUILDING_DEFS[this.placing.defId];
+      v = c && this.world.canPlace(def, TEAM_PLAYER, c.cx, c.cz) === '' ? CURSORS.place : CURSORS.invalid;
+    } else if (this.targeting) {
+      v = this.targeting.type === 'attackMove' ? CURSORS.attack : CURSORS.target;
+    } else if (this.overCanvas && !this.drag) {
+      const e = this.pick(this.mouseX, this.mouseY);
+      const commanding = this.selectedUnits().length > 0;
+      if (e && commanding && e.team !== TEAM_PLAYER && this.world.hostile(TEAM_PLAYER, e.team) && !e.invulnerable) v = CURSORS.attack;
+      else if (e) v = CURSORS.select;
+      else if (commanding) v = CURSORS.move;
+    }
+    memo.cursorMemo = { t: now, v };
+    return v;
   }
 }

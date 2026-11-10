@@ -47,7 +47,7 @@ try {
   await page.goto(base);
   await page.waitForSelector('[data-testid="btn-start"]', { timeout: 120000 });
   const menuButtons = await page.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.dataset.testid ?? b.textContent.trim().slice(0, 20)));
-  c.check('1a main menu lists hero, difficulty, battlefield and action buttons', menuButtons.length === 11, menuButtons.join(' '));
+  c.check('1a main menu lists hero, difficulty, battlefield, settings and action buttons', menuButtons.length === 12, menuButtons.join(' '));
   for (const id of ['hero-rook', 'hero-kade', 'hero-nyx', 'difficulty-normal', 'difficulty-hard', 'difficulty-easy', 'theme-verdant', 'theme-scorched', 'theme-frost']) {
     await page.click(`[data-testid="${id}"]`);
     const active = await page.evaluate((t) => document.querySelector(`[data-testid="${t}"]`).classList.contains('active'), id);

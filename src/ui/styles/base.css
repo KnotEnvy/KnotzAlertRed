@@ -1,0 +1,287 @@
+/* ==================================================================== tokens
+   Aegis hardware: machined charcoal-blue plates, chamfered corners, cyan instrument light,
+   amber for caution, crimson for the enemy and for danger. */
+:root {
+  --ink-0: #03060a;
+  --ink-1: #070c13;
+  --ink-2: #0c141e;
+  --ink-3: #132030;
+  --ink-4: #1b2c40;
+
+  --fill: linear-gradient(180deg, rgba(20, 31, 45, 0.95) 0%, rgba(10, 16, 25, 0.96) 100%);
+  --fill-solid: #0c141e;
+  --edge: rgba(122, 170, 205, 0.26);
+  --edge-2: rgba(140, 200, 230, 0.42);
+  --edge-hi: rgba(140, 236, 245, 0.85);
+
+  --text: #dce7ec;
+  --text-2: #a9bac6;
+  --text-3: #6e8293;
+  --dim: #7d8f9f;
+
+  --cobalt: #245acb;
+  --cobalt-hi: #3a78ef;
+  --cobalt-deep: #12306f;
+  --cyan: #42e6ef;
+  --cyan-soft: rgba(66, 230, 239, 0.16);
+  --amber: #ffa63d;
+  --gold: #f4cc63;
+  --crimson: #9d2631;
+  --crimson-hi: #e8495a;
+  --orange: #ff8a38;
+  --green: #5fe39a;
+
+  --hp-good: #5fe39a;
+  --hp-mid: #f4cc63;
+  --hp-low: #ef4b55;
+
+  --font: 'Barlow', 'Segoe UI', system-ui, sans-serif;
+  --display: 'Chakra Petch', 'Barlow', 'Segoe UI', system-ui, sans-serif;
+
+  --cut: 10px;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink-0);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13.5px;
+  line-height: 1.35;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+html {
+  cursor: var(--cur-default, default);
+}
+button,
+.notice.link,
+.slider input,
+canvas.minimap {
+  cursor: var(--cur-pointer, pointer);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+button:focus {
+  outline: none;
+}
+button:focus-visible {
+  outline: 1px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+b {
+  font-weight: 600;
+}
+
+.dim {
+  color: var(--text-3);
+}
+.good {
+  color: var(--green);
+}
+.warn {
+  color: var(--amber);
+}
+.bad {
+  color: var(--crimson-hi);
+}
+
+/* ==================================================================== keycaps */
+kbd {
+  display: inline-block;
+  min-width: 19px;
+  padding: 1px 5px 2px;
+  border: 1px solid rgba(160, 205, 230, 0.32);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+  font: 600 10.5px/1.25 var(--display);
+  text-align: center;
+  color: var(--text);
+  vertical-align: 1px;
+}
+/* mouse-button keycap: L / R inside a little mouse outline */
+kbd.mb {
+  min-width: 15px;
+  padding: 1px 3px 2px;
+  border-radius: 7px 7px 6px 6px;
+  font-size: 9px;
+  color: var(--cyan);
+}
+
+/* ==================================================================== vector glyphs */
+.svg-glyph {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.14em;
+  flex: none;
+}
+
+/* ==================================================================== plates
+   .plate: chamfered panel with a 1px machined edge (top-left and bottom-right corners cut).
+   The element background is the edge colour; ::before paints the fill 1px inside. */
+.plate {
+  --c: var(--cut);
+  position: relative;
+  isolation: isolate;
+  background: var(--plate-edge, var(--edge));
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+}
+.plate::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  background: var(--plate-fill, var(--fill));
+  clip-path: polygon(
+    calc(var(--c) - 0.6px) 0,
+    100% 0,
+    100% calc(100% - var(--c) + 0.6px),
+    calc(100% - var(--c) + 0.6px) 100%,
+    0 100%,
+    0 calc(var(--c) - 0.6px)
+  );
+}
+
+/* ==================================================================== buttons */
+.btn {
+  --c: 9px;
+  --plate-edge: var(--edge-2);
+  --plate-fill: linear-gradient(180deg, rgba(34, 50, 70, 0.95), rgba(14, 22, 33, 0.97));
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 11px 22px;
+  border: 0;
+  background: var(--plate-edge);
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+  font: 600 13px/1 var(--display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text);
+  transition: transform 0.12s var(--ease-out), filter 0.12s;
+}
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  background: var(--plate-fill);
+  clip-path: polygon(
+    calc(var(--c) - 0.6px) 0,
+    100% 0,
+    100% calc(100% - var(--c) + 0.6px),
+    calc(100% - var(--c) + 0.6px) 100%,
+    0 100%,
+    0 calc(var(--c) - 0.6px)
+  );
+  transition: background 0.15s;
+}
+.btn .svg-glyph {
+  width: 16px;
+  height: 16px;
+  color: var(--cyan);
+}
+.btn:hover {
+  --plate-edge: var(--edge-hi);
+  --plate-fill: linear-gradient(180deg, rgba(40, 84, 110, 0.95), rgba(16, 30, 44, 0.97));
+}
+.btn:active {
+  transform: translateY(1px) scale(0.985);
+}
+.btn.primary {
+  --plate-edge: #8cf4fb;
+  --plate-fill: linear-gradient(180deg, #3d7cf2 0%, #2459cc 48%, #173f9c 100%);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 20, 60, 0.6);
+}
+.btn.primary .svg-glyph {
+  color: #fff;
+}
+.btn.primary:hover {
+  --plate-edge: #c9fbff;
+  --plate-fill: linear-gradient(180deg, #5591ff 0%, #2f69e0 48%, #1c48aa 100%);
+  filter: drop-shadow(0 0 10px rgba(66, 230, 239, 0.45));
+}
+.btn.danger .svg-glyph {
+  color: var(--crimson-hi);
+}
+.btn.danger:hover {
+  --plate-edge: var(--crimson-hi);
+  --plate-fill: linear-gradient(180deg, rgba(110, 28, 38, 0.95), rgba(40, 10, 14, 0.97));
+}
+.btn.ghost {
+  --plate-edge: rgba(220, 231, 236, 0.28);
+  --plate-fill: linear-gradient(180deg, rgba(8, 14, 22, 0.62), rgba(8, 14, 22, 0.75));
+  padding: 9px 16px;
+  font-size: 12px;
+}
+.btn.ghost:hover {
+  --plate-edge: var(--edge-hi);
+  --plate-fill: linear-gradient(180deg, rgba(20, 50, 66, 0.8), rgba(8, 18, 28, 0.85));
+}
+
+/* ==================================================================== motion helpers */
+@keyframes deny-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
