@@ -224,13 +224,16 @@ try {
     const hq = w.buildings.find((b) => b.team === 0 && b.def.id === 'hq');
     for (let i = 0; i < 8; i++) w.spawnUnit(i % 2 ? 'tank' : 'trooper', 1, hq.x + 30 + (i % 4) * 3, hq.z + 26 + Math.floor(i / 4) * 3);
     for (const u of w.units) if (u.team === 1 && !u.def.harvester && Math.hypot(u.x - hq.x, u.z - hq.z) < 60) u.setOrder({ type: 'attackMove', x: hq.x, z: hq.z, target: null, ability: -1 });
+    // send the garrison out to meet them, so the fight does not depend on where the attackers wander
+    for (const u of w.units) if (u.team === 0 && u.def.weapon && !u.def.harvester) u.setOrder({ type: 'attackMove', x: hq.x + 22, z: hq.z + 19, target: null, ability: -1 });
   });
-  for (let i = 0; i < 8; i++) {
+  let kills1 = kills0;
+  for (let i = 0; i < 14 && (i < 8 || kills1 <= kills0); i++) {
     await sim(4);
     await page.waitForTimeout(120);
     if (i === 2) await shot('07-battle');
+    kills1 = await page.evaluate(() => window.__game.world.players[0].stats.unitsKilled);
   }
-  const kills1 = await page.evaluate(() => window.__game.world.players[0].stats.unitsKilled);
   check('combat loop resolves kills', kills1 > kills0, `${kills0} -> ${kills1}`);
 
   // ---------------------------------------------------------------- building commands, pause, help

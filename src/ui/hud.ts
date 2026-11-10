@@ -929,7 +929,7 @@ export class Hud {
         if (this.host.world.time > 1) pulse(row, 'just', 1200);
       }
     });
-    if (done > this.objectivesDone && this.host.world.time > 1) this.host.audio.play('ready');
+    if (done > this.objectivesDone && this.host.world.time > 1) this.host.audio.play('objective');
     this.objectivesDone = done;
     setText(this.objectiveCount, `${done}/${OBJECTIVES.length}`);
     // the last step is winning the match; hide once everything before it is done

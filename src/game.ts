@@ -39,6 +39,11 @@ export class Game {
   private endTimer = 0;
   private disposed = false;
   private started = false;
+  // music director input: damage dealt by either side over the last half second
+  private combatT = 0;
+  private combatDmg = -1;
+  private fundsStalled = false;
+  private fundsWarnAt = -1e9;
   private onResize = () => {
     this.renderer.resize();
     this.overlay.resize();
@@ -124,7 +129,8 @@ export class Game {
   start(): void {
     this.started = true;
     this.applySettings();
-    this.audio.startMusic();
+    this.audio.setTheme(this.config.theme);
+    this.audio.startMusic('game');
     const p = this.world.players[TEAM_PLAYER];
     this.hud.notify(`${p.heroDef.name} reporting. Build a Fusion Reactor, then a Refinery.`, 'info');
     window.setTimeout(() => {
@@ -173,7 +179,7 @@ export class Game {
     if (!w.result || this.endShown) return;
     this.endShown = true;
     this.input.cancelModes();
-    this.audio.play(w.result === 'victory' ? 'levelup' : 'powerdown');
+    this.audio.endMatch(w.result);
     this.audio.say(w.result === 'victory' ? 'Mission accomplished' : 'Mission failed');
     this.screens.end(w.result, w.time, w.players[TEAM_PLAYER].stats, w.players[TEAM_ENEMY].stats, {
       onRestart: () => this.cb.onRestart(),
@@ -200,6 +206,7 @@ export class Game {
         this.audio.lz = cam.focusZ;
         this.audio.lyaw = cam.yaw;
         this.audio.lrange = 60 + cam.dist * 0.9;
+        if (dt > 0) this.measureCombat(dt);
         this.renderer.render(dt, this.input.view());
         this.overlay.draw(this.world, cam, this.input.selectedSet, this.input.drag, dt);
         this.hud.update(raw);
@@ -219,6 +226,32 @@ export class Game {
     }
   }
 
+  /**
+   * Feed the music director twice a second: recent damage dealt by either side (the player
+   * is involved in every fight) and how many enemy units are in sight. Also warns once when
+   * production stalls for lack of credits.
+   */
+  private measureCombat(dt: number): void {
+    this.combatT += dt;
+    if (this.combatT < 0.5) return;
+    const w = this.world;
+    const me = w.players[TEAM_PLAYER];
+    const dmg = me.stats.damageDealt + w.players[TEAM_ENEMY].stats.damageDealt;
+    const rate = this.combatDmg < 0 ? 0 : (dmg - this.combatDmg) / this.combatT;
+    this.combatDmg = dmg;
+    this.combatT = 0;
+    let threat = 0;
+    for (const u of w.units) if (u.alive && u.team === TEAM_ENEMY && u.visible) threat++;
+    this.audio.setCombat(1 - Math.exp(-rate / 220), Math.min(1, threat / 8));
+    const stalled = Object.values(me.queues).some((q) => q.stalled === 'funds');
+    if (stalled && !this.fundsStalled && w.time - this.fundsWarnAt > 20) {
+      this.fundsWarnAt = w.time;
+      this.audio.play('no_funds');
+      this.audio.say('Insufficient funds');
+    }
+    this.fundsStalled = stalled;
+  }
+
   // ------------------------------------------------------------------ sim → presentation
   private makeHooks(): Hooks {
     const fx = this.renderer.fx;
@@ -226,9 +259,9 @@ export class Game {
     const cam = this.renderer.cam;
     const seen = (x: number, z: number) => fog.isVisible(x, z);
     return {
-      sound: (id, x, z, vol) => {
+      sound: (id, x, z, vol, team) => {
         if (x !== undefined && z !== undefined && !seen(x, z)) return;
-        this.audio.play(id, x, z, vol);
+        this.audio.play(id, x, z, vol, { own: team === TEAM_PLAYER });
       },
       voice: (line) => this.audio.say(line),
       notify: (text: string, kind: NoticeKind, x?: number, z?: number) => this.hud.notify(text, kind, x, z),

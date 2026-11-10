@@ -117,10 +117,10 @@ export class Projectile {
     w.hooks.explosion(this.x, Math.max(this.y, ground + 0.3), this.z, size);
     if (this.type === 'lob') {
       w.hooks.scorch(this.x, this.z, this.big ? 3 : 2);
-      w.hooks.sound(this.big ? 'explosion_l' : 'explosion_m', this.x, this.z);
+      w.hooks.sound(this.big ? 'explosion_l' : 'explosion_m', this.x, this.z, 1, this.team);
       if (this.big) w.hooks.shake(this.x, this.z, 0.5);
     } else {
-      w.hooks.sound('explosion_s', this.x, this.z, 0.7);
+      w.hooks.sound('explosion_s', this.x, this.z, 0.7, this.team);
     }
   }
 }

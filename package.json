@@ -14,7 +14,8 @@
     "movetest": "node scripts/movetest.mjs",
     "verify": "node scripts/verify/input.mjs && node scripts/verify/hud.mjs && node scripts/verify/combat.mjs",
     "assets": "bash assets/build.sh",
-    "showcase": "node scripts/showcase.mjs"
+    "showcase": "node scripts/showcase.mjs",
+    "audio:render": "node scripts/audio-render.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "^9.35.0",
