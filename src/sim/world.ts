@@ -530,6 +530,7 @@ export class World {
         this.hooks.sound(u.radius > 1.6 ? 'explosion_l' : 'explosion_m', u.x, u.z);
         this.hooks.shake(u.x, u.z, 0.35);
         if (!u.flying) this.hooks.scorch(u.x, u.z, u.radius * 1.6);
+        this.hooks.wreck({ kind: 'unit', model: u.def.model, team: u.team, x: u.x, z: u.z, alt: u.alt, heading: u.heading, aim: u.turretYaw, w: u.radius, h: u.radius });
       }
       if (u.hero && owner) {
         owner.hero = null;
@@ -553,6 +554,7 @@ export class World {
         this.hooks.explosion(b.x + (Math.random() - 0.5) * span * 1.4, gy + Math.random() * b.height * 0.7, b.z + (Math.random() - 0.5) * span * 1.4, span * 0.5);
       }
       this.hooks.scorch(b.x, b.z, span * 1.5);
+      this.hooks.wreck({ kind: 'building', model: b.def.model, team: b.team, x: b.x, z: b.z, alt: 0, heading: 0, aim: b.turretYaw, w: b.w * CELL, h: b.h * CELL });
       this.hooks.sound('explosion_l', b.x, b.z, 1.2);
       this.hooks.shake(b.x, b.z, 1);
       if (b.team === TEAM_PLAYER) {

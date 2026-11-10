@@ -16,10 +16,10 @@ export class FogView {
   private mesh: Mesh;
   private tex: RawTexture;
   private data = new Uint8Array(SIZE * SIZE * 4);
-  private current = new Float32Array(SIZE * SIZE).fill(0.9);
-  private target = new Float32Array(SIZE * SIZE).fill(0.9);
-  private raw = new Float32Array(SIZE * SIZE).fill(0.9);
-  private tmp = new Float32Array(SIZE * SIZE).fill(0.9);
+  private current = new Float32Array(SIZE * SIZE).fill(0.82);
+  private target = new Float32Array(SIZE * SIZE).fill(0.82);
+  private raw = new Float32Array(SIZE * SIZE).fill(0.82);
+  private tmp = new Float32Array(SIZE * SIZE).fill(0.82);
   private lastVersion = -1;
   private uploadT = 0;
 
@@ -105,7 +105,7 @@ export class FogView {
       for (let x = 0; x < SIZE; x++) {
         const i = z * SIZE + x;
         if (x === 0 || z === 0 || x === SIZE - 1 || z === SIZE - 1) {
-          dst[i] = 0.9;
+          dst[i] = 0.82;
           continue;
         }
         dst[i] =

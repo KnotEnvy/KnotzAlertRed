@@ -107,3 +107,37 @@ def bush(m):
     p.ico(0.44, at=(0.52, 0.2, 0.26), mat='leaf', scale=(1, 1, 0.8), seed=2, jitter=0.2)
     p.ico(0.36, at=(-0.42, -0.3, 0.22), mat='cap', scale=(1, 1, 0.8), seed=3, jitter=0.2)
     p.ico(0.3, at=(-0.1, 0.5, 0.2), mat='leaf', scale=(1, 1, 0.8), seed=4, jitter=0.2)
+
+
+# ----------------------------------------------------------------------------- battle debris
+@prop('debris', ao_dist=0.5, ao_strength=0.5)
+def debris(m):
+    """A jagged plate of torn armour. Light grey so the game can tint it per explosion."""
+    p = m.part('body')
+    p.prism([(-0.5, -0.3), (0.1, -0.42), (0.52, -0.1), (0.36, 0.34), (-0.2, 0.4), (-0.46, 0.12)], 0.16, axis='z', at=(0, 0, -0.08),
+            mat=(0.82, 0.82, 0.82), taper=0.8, bevel=0.03)
+    p.box((0.34, 0.12, 0.12), at=(0.1, 0.05, 0.1), mat=(0.5, 0.5, 0.5), rot=(0, 20, 30))
+
+
+@prop('rubble', ao_dist=1.6)
+def rubble(m):
+    """What is left of a structure: broken slabs, twisted beams and scorched fill on a 2x2 footprint."""
+    p = m.part('body')
+    rnd = random.Random(21)
+    char = (0.1, 0.095, 0.09)
+    p.ico(1.0, at=(0, 0, -0.05), mat=char, scale=(1.05, 1.05, 0.22), seed=3, jitter=0.12)
+    for i in range(9):
+        a = rnd.random() * math.tau
+        d = rnd.random() * 0.72
+        w, l = 0.25 + rnd.random() * 0.4, 0.3 + rnd.random() * 0.5
+        mat = ('concrete', 'concrete_dark', 'panel_dark', 'gunmetal', 'team_dark')[i % 5]
+        p.box((w, l, 0.1 + rnd.random() * 0.14), at=(math.cos(a) * d, math.sin(a) * d, 0.12 + rnd.random() * 0.22), mat=mat,
+              rot=(rnd.uniform(-38, 38), rnd.uniform(-38, 38), rnd.random() * 180), bevel=0.02)
+    for i in range(4):
+        a = rnd.random() * math.tau
+        d = 0.2 + rnd.random() * 0.5
+        p.box((0.07, 0.07, 0.7 + rnd.random() * 0.5), at=(math.cos(a) * d, math.sin(a) * d, 0.34), mat='gunmetal',
+              rot=(rnd.uniform(-55, 55), rnd.uniform(-55, 55), 0))
+    for i in range(3):
+        a = rnd.random() * math.tau
+        p.box((0.12, 0.12, 0.06), at=(math.cos(a) * 0.4, math.sin(a) * 0.4, 0.2), mat=('glow', (1.0, 0.45, 0.12)))

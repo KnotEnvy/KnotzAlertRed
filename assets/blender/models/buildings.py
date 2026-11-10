@@ -8,10 +8,13 @@ import math
 from kz.kit import glow, ngon, rect
 from kz.registry import model
 
+from .crimson import blade, crown, horn, spike
+
 WARM = glow(1.0, 0.62, 0.25)
 
 
 def building(name, **kw):
+    kw.setdefault('factions', kw.get('team') is None)
     return model(name, kind='building', icon=name, icon_yaw=32, **kw)
 
 
@@ -123,6 +126,13 @@ def hq(m):
     windows(b, -1.3, 1.3, 4.62, 1.2, 3, h=0.3, face='+x')
     windows(b, -1.3, 1.3, -4.62, 1.2, 3, h=0.3, face='-x')
     b.pipe([(2.9, 3.2, 0.5), (2.9, 3.2, 2.2), (2.2, 2.6, 3.4)], 0.14, mat='gunmetal', mirror=True)
+    if m.faction == 1:
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                horn(b, sx * 3.95, sy * 3.95, 3.9, h=1.7, lean=10)
+        crown(b, 0, 0.2, 6.82, 3.3, 3.0, n=3, h=0.6)
+        blade(b, (1.0, -3.7, 2.8), length=1.2, height=1.1, mirror=True, rot=(0, 0, 180))
+
     # radar pedestal
     b.cyl(0.5, 0.5, at=(0.2, 0.3, 7.05), seg=8, mat='gunmetal')
     b.cyl(0.18, 0.9, at=(0.2, 0.3, 7.6), seg=6, mat='metal')
@@ -171,6 +181,14 @@ def power(m):
     b.box((0.3, 0.06, 0.2), at=(2.2, -2.46, 0.6), mat='glow')
     lamp(b, 2.5, -1.2, 0.3, 0.9)
     mast(b, -2.4, -1.5, 1.76, 1.6)
+    if m.faction == 1:
+        for i in range(6):
+            a = (i + 0.5) / 6 * math.tau
+            spike(b, (cx + math.cos(a) * 1.75, cy + math.sin(a) * 1.75, 2.95), r=0.16, h=0.9, rot=(-math.sin(a) * 30, math.cos(a) * 30, 0), mat='team_dark')
+        for x in (-1.75, 1.6):
+            for k in range(3):
+                a = k * 2.1
+                spike(b, (x + math.cos(a) * 0.6, 2.0 + math.sin(a) * 0.6, 4.05), r=0.1, h=0.5, mat='team')
 
     # a slow ring of containment nodes circling the core
     r = m.part('ring', role='spin', pivot=(cx, cy, 2.0), speed=0.7)
@@ -224,6 +242,13 @@ def refinery(m):
     b.box((1.3, 0.9, 1.0), at=(-0.2, 3.0, 0.8), mat='panel_dark', bevel=0.06)
     lamp(b, 0.9, -3.4, 0.3, 0.9)
     lamp(b, -4.4, -3.4, 0.3, 0.9)
+    if m.faction == 1:
+        for x in (-3.9, -2.6, -1.3, 0.0):
+            spike(b, (x, 0.3, 3.62), r=0.16, h=0.6, mat='team_dark')
+        for y in (-1.75, 1.85):
+            for k in range(4):
+                a = k * math.pi / 2 + 0.6
+                spike(b, (2.95 + math.cos(a) * 1.15, y + math.sin(a) * 1.15, 4.0), r=0.12, h=0.6, rot=(-math.sin(a) * 25, math.cos(a) * 25, 0), mat='team')
 
 
 # ----------------------------------------------------------------------------- Barracks
@@ -261,6 +286,11 @@ def barracks(m):
     b.cyl(0.06, 3.6, at=(-3.3, -2.3, 2.1), seg=6, mat='gunmetal', noao=True)
     b.prism([(0.0, 0.0), (0.0, 0.8), (1.25, 0.66), (0.95, 0.4), (1.25, 0.14)], 0.05, axis='y', at=(-3.3, -2.3, 3.0), mat='glow', noao=True)
     lamp(b, -2.6, -2.55, 0.3, 0.8)
+    if m.faction == 1:
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                spike(b, (sx * 3.15, 0.2 + sy * 2.05, 2.3), r=0.2, h=0.9, mat='team')
+        crown(b, 0, 0.2, 3.41, 4.4, 2.0, n=3, h=0.5)
 
 
 # ----------------------------------------------------------------------------- War Factory
@@ -308,6 +338,13 @@ def factory(m):
     b.pipe([(3.1, -1.7, 1.0), (2.75, -1.7, 1.6)], 0.16, mat='gunmetal')
     lamp(b, -4.4, -3.4, 0.3, 1.0)
     lamp(b, 2.9, -3.4, 0.3, 1.0)
+    if m.faction == 1:
+        for y in (-2.6, -0.9, 0.8, 2.5):
+            spike(b, (hx - 2.55, y, 3.9), r=0.18, h=0.8, rot=(0, -20, 0), mat='team_dark')
+            spike(b, (hx + 2.55, y, 3.9), r=0.18, h=0.8, rot=(0, 20, 0), mat='team_dark')
+        crown(b, tx, ty, 5.94, 2.0, 2.3, n=2, h=0.6, mat='team')
+        horn(b, hx - 2.75, -2.95, 3.4, h=1.3, lean=8)
+        horn(b, hx + 2.75, -2.95, 3.4, h=1.3, lean=8)
 
 
 # ----------------------------------------------------------------------------- Tech Lab
@@ -342,6 +379,10 @@ def techlab(m):
     b.cyl(0.4, 1.4, at=(-2.25, 1.6, 1.0), seg=8, mat='panel_dark')
     b.cyl(0.42, 0.2, at=(-2.25, 1.6, 1.3), seg=8, mat='hazard')
     b.cyl(0.14, 1.0, at=(2.0, 1.2, 3.2), seg=6, mat='gunmetal')
+    if m.faction == 1:
+        for i in range(6):
+            a = math.radians(i * 60)
+            spike(b, (math.cos(a) * 2.25, math.sin(a) * 2.25, 2.64), r=0.18, h=1.0, rot=(-math.sin(a) * 18, math.cos(a) * 18, 0), mat='team')
 
     d = m.part('dish', role='spin', pivot=(2.0, 1.2, 3.75), speed=0.6)
     with d.at((2.0, 1.2, 3.75)):
@@ -389,6 +430,11 @@ def airpad(m):
     b.box((0.16, 2.6, 0.9), at=(3.55, -1.2, 0.95), mat='panel_dark', rot=(0, -18, 0), bevel=0.03)
     lamp(b, -3.3, -3.3, 0.3, 0.8)
     lamp(b, 3.3, -3.3, 0.3, 0.8)
+    if m.faction == 1:
+        crown(b, tx, ty, 4.28, 2.0, 2.0, n=2, h=0.55, mat='team')
+        for i in range(8):
+            a = i / 8 * math.tau
+            spike(b, (math.cos(a) * 3.62, math.sin(a) * 3.62, 0.62), r=0.14, h=0.5, rot=(-math.sin(a) * 30, math.cos(a) * 30, 0), mat='team_dark')
 
     r = m.part('radar', role='spin', pivot=(tx, ty, 4.75), speed=1.6)
     with r.at((tx, ty, 4.75)):
@@ -417,6 +463,11 @@ def sentry(m):
     b.box((0.5, 0.4, 0.6), at=(1.15, 1.0, 0.7), mat='panel', bevel=0.05)                     # ammo locker
     b.box((0.3, 0.05, 0.14), at=(1.15, 0.78, 0.8), mat='glow')
 
+    if m.faction == 1:
+        for i in range(4):
+            a = math.radians(45 + i * 90)
+            spike(b, (math.cos(a) * 1.3, math.sin(a) * 1.3, 0.8), r=0.16, h=0.8, rot=(-math.sin(a) * 30, math.cos(a) * 30, 0), mat='team')
+
     piv = (0, 0, 2.2)
     t = m.part('turret', role='turret', pivot=piv, travel=0.06)
     with t.at(piv):
@@ -428,6 +479,8 @@ def sentry(m):
         t.box((0.5, 0.06, 0.16), at=(0, 0.87, 0.52), mat='glow')                               # sensor bar
         t.box((0.2, 0.3, 0.2), at=(0, -0.5, 0.82), mat='gunmetal')
         t.cyl(0.02, 0.8, at=(0.3, -0.6, 1.1), seg=4, mat='black', noao=True)
+        if m.faction == 1:
+            blade(t, (0.45, -0.3, 0.72), length=0.8, height=0.5, mirror=True)
 
     g = m.part('barrel', role='barrel', pivot=piv, travel=0.3)
     with g.at(piv):
@@ -462,6 +515,12 @@ def cannon(m):
         t.box((0.3, 0.05, 0.16), at=(0.5, 0.03, 1.0), mat='glow')
         t.cyl(0.3, 0.14, at=(-0.4, -0.3, 0.92), seg=8, mat='panel_dark')
         t.cyl(0.02, 1.2, at=(-0.7, -1.2, 1.3), seg=4, mat='black', noao=True)
+        if m.faction == 1:
+            blade(t, (0.75, -1.1, 0.86), length=1.2, height=0.75, mirror=True, rot=(0, 0, -8))
+    if m.faction == 1:
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                spike(b, (sx * 1.45, sy * 1.45, 1.4), r=0.16, h=0.7, mat='team')
 
     g = m.part('barrel', role='barrel', pivot=piv, travel=0.6)
     with g.at(piv):
@@ -474,6 +533,8 @@ def cannon(m):
 @building('arc')
 def arc(m):
     """Arc Pylon: a coil tower. Charge climbs three collector rings to a caged discharge orb."""
+    # the Dominion's pylons discharge violet, as on the fortress in the key art
+    energy = glow(0.85, 0.38, 1.3) if m.faction == 1 else 'glow'
     b = m.part('body')
     _turret_base(b, r=1.65, h=0.6)
     b.cyl(0.95, 0.8, at=(0, 0, 1.3), seg=8, r2=0.7, mat='panel')
@@ -482,25 +543,30 @@ def arc(m):
         z = 2.2 + i * 1.15
         r = 1.0 - i * 0.2
         b.ring(r, r - 0.2, 0.26, at=(0, 0, z), seg=12, mat='team')
-        b.ring(r - 0.06, r - 0.26, 0.12, at=(0, 0, z + 0.2), seg=12, mat='glow')
+        b.ring(r - 0.06, r - 0.26, 0.12, at=(0, 0, z + 0.2), seg=12, mat=energy)
         for k in range(3):
             a = math.radians(k * 120 + i * 40)
             b.box((r - 0.4, 0.1, 0.1), at=(math.cos(a) * (r - 0.1) / 2 * 1.2, math.sin(a) * (r - 0.1) / 2 * 1.2, z), mat='gunmetal', rot=(0, 0, math.degrees(a)))
     # discharge head: an orb held by four prongs
-    b.ico(0.6, at=(0, 0, 6.35), mat='glow', subdiv=2, smooth=True)
+    b.ico(0.6, at=(0, 0, 6.35), mat=energy, subdiv=2, smooth=True)
     for k in range(4):
         a = math.radians(k * 90 + 45)
         b.pipe([(math.cos(a) * 0.3, math.sin(a) * 0.3, 5.5), (math.cos(a) * 0.95, math.sin(a) * 0.95, 6.0), (math.cos(a) * 0.9, math.sin(a) * 0.9, 6.7),
                 (math.cos(a) * 0.45, math.sin(a) * 0.45, 7.15)], 0.08, mat='panel_dark', seg=4)
     b.box((0.6, 0.5, 0.7), at=(1.1, -1.05, 0.9), mat='panel', bevel=0.05)                     # capacitor bank
-    b.box((0.36, 0.05, 0.2), at=(1.1, -1.31, 1.0), mat='glow')
+    b.box((0.36, 0.05, 0.2), at=(1.1, -1.31, 1.0), mat=energy)
     b.pipe([(0.85, -0.8, 1.0), (0.55, -0.5, 1.5)], 0.09, mat='black')
+
+    if m.faction == 1:
+        for i in range(4):
+            a = math.radians(i * 90)
+            spike(b, (math.cos(a) * 1.25, math.sin(a) * 1.25, 0.9), r=0.18, h=1.0, rot=(-math.sin(a) * 28, math.cos(a) * 28, 0), mat='team')
 
     r = m.part('halo', role='spin', pivot=(0, 0, 6.35), speed=2.4)
     r.ring(1.25, 1.14, 0.08, at=(0, 0, 6.35), seg=12, mat='gunmetal', noao=True)
     for k in range(3):
         a = math.radians(k * 120)
-        r.box((0.18, 0.18, 0.34), at=(math.cos(a) * 1.2, math.sin(a) * 1.2, 6.35), mat='glow')
+        r.box((0.18, 0.18, 0.34), at=(math.cos(a) * 1.2, math.sin(a) * 1.2, 6.35), mat=energy)
 
 
 # ----------------------------------------------------------------------------- neutral outposts

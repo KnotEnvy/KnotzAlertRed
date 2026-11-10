@@ -1,3 +1,4 @@
+import { MUZZLES } from '../data/muzzles';
 import { FLY_HEIGHT, GRID, TEAM_PLAYER, WORLD } from '../core/config';
 import { clamp, dist, turnToward, wrapAngle, yawOf } from '../core/math';
 import type { HeroDef, UnitDef, WeaponDef } from '../data/types';
@@ -420,15 +421,16 @@ export class Unit extends Entity {
     const wpn = this.def.weapon;
     if (!wpn) return;
     const yaw = this.def.turret ? this.turretYaw : this.heading;
+    const mz0 = MUZZLES[this.def.model];
     let lat = 0;
     if (wpn.burst && wpn.burst > 1) {
       this.burstSide = -this.burstSide;
-      lat = this.burstSide * this.radius * 0.28;
+      lat = this.burstSide * (mz0?.[2] ?? this.radius * 0.28);
     }
-    const fwd = this.radius * 1.2;
+    const fwd = mz0 ? mz0[0] : this.radius * 1.2;
     const mx = this.x + Math.sin(yaw) * fwd + Math.cos(yaw) * lat;
     const mz = this.z + Math.cos(yaw) * fwd - Math.sin(yaw) * lat;
-    const my = w.groundY(this.x, this.z) + this.alt + this.height * 0.6;
+    const my = w.groundY(this.x, this.z) + this.alt + (mz0 ? mz0[1] : this.height * 0.6);
     w.fireWeapon(this, wpn, t, mx, my, mz, yaw, this.damageMul(w));
     this.recoil = 1;
   }

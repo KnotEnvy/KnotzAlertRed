@@ -4,6 +4,8 @@ import math
 from kz.kit import glow, ngon
 from kz.registry import model
 
+from .crimson import spike
+
 SKIN = (0.78, 0.6, 0.48)
 
 
@@ -65,9 +67,14 @@ def soldier(p, pose, weapon, chest='team', helm='panel', crest='team', visor='gl
 
 def frames(m, build):
     """Standing body plus the two stride frames the renderer alternates between while moving."""
-    build(m.part('body'), 0)
-    build(m.part('walk1', role='walk', frame=1), 1)
-    build(m.part('walk2', role='walk', frame=2), 2)
+    for pose, part in ((0, m.part('body')), (1, m.part('walk1', role='walk', frame=1)), (2, m.part('walk2', role='walk', frame=2))):
+        build(part, pose)
+        if m.faction == 1:
+            # Dominion infantry: spiked pauldrons and a horned crest
+            z = 0.03 if pose else 0
+            lean = 0.07 if pose else 0
+            spike(part, (0.52, lean, 1.78 + z), r=0.09, h=0.34, rot=(0, 40, 0), mat='team', mirror=True)
+            spike(part, (0.0, lean * 2 - 0.1, 2.24 + z), r=0.08, h=0.36, rot=(25, 0, 0), mat='team')
 
 
 # ----------------------------------------------------------------------------- trooper
@@ -82,7 +89,7 @@ def _rifle(p, lean):
         p.box((0.06, 0.26, 0.06), at=(0, 0.1, 0.12), mat='glow')                       # sight rail
 
 
-@model('trooper', icon='trooper', ao_dist=0.7)
+@model('trooper', icon='trooper', ao_dist=0.7, factions=True)
 def trooper(m):
     frames(m, lambda p, pose: soldier(p, pose, _rifle))
 
@@ -100,7 +107,7 @@ def _launcher(p, lean):
         p.box((0.06, 0.06, 0.1), at=(-0.16, 0.3, 0.06), mat='glow')
 
 
-@model('lancer', icon='lancer', ao_dist=0.7)
+@model('lancer', icon='lancer', ao_dist=0.7, factions=True)
 def lancer(m):
     def build(p, pose):
         soldier(p, pose, _launcher, helm='gunmetal', crest='glow', pack_size=(0.5, 0.26, 0.56), pack_mat='panel_dark')
@@ -122,7 +129,7 @@ def _thumper(p, lean):
         p.box((0.1, 0.4, 0.14), at=(0, -0.36, 0), mat='black')
 
 
-@model('grenadier', icon='grenadier', ao_dist=0.7)
+@model('grenadier', icon='grenadier', ao_dist=0.7, factions=True)
 def grenadier(m):
     def build(p, pose):
         soldier(p, pose, _thumper, chest='team', helm='hazard', crest='gunmetal', pack_size=(0.56, 0.3, 0.6), pack_mat='team_dark')

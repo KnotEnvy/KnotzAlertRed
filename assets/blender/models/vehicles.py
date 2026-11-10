@@ -2,6 +2,8 @@
 from kz.kit import glow, ngon, rect
 from kz.registry import model
 
+from .crimson import blade, spike, teeth
+
 
 def tracks(p, half, length, w=0.62, h=0.72, wheels=4, y=0.0):
     """A pair of tread units with road wheels showing through."""
@@ -41,7 +43,7 @@ def antenna(p, at, h=1.0, r=0.02, tip=True):
         p.box((0.07, 0.07, 0.07), at=(at[0], at[1], at[2] + h), mat='glow')
 
 
-@model('tank', icon='tank')
+@model('tank', icon='tank', factions=True)
 def tank(m):
     """Mauler: the line tank. Sloped glacis, side skirts in alternating paint, hex turret."""
     b = m.part('body')
@@ -85,6 +87,12 @@ def tank(m):
         for k in range(2):
             t.cyl(0.07, 0.24, at=(s * (0.92 + k * 0.02), 0.25 - k * 0.2, z0 + 0.3), axis='y', seg=6, mat='gunmetal', rot=(0, 0, -s * 25))
 
+    if m.faction == 1:
+        teeth(b, 1.95, 0.62, 2.3, n=5, size=0.42)
+        spike(b, (1.36, 1.6, 0.98), r=0.1, h=0.5, rot=(-60, 0, 0), mat='team', mirror=True)
+        blade(t, (0.58, -1.0, z0 + 0.5), length=1.0, height=0.62, mirror=True, rot=(0, 0, -8))
+        blade(t, (0.0, -1.25, z0 + 0.5), length=0.7, height=0.4, mat='gunmetal')
+
     g = m.part('barrel', role='barrel', pivot=(0, -0.1, 1.28), travel=0.42)
     g.cyl(0.19, 0.7, at=(0, 1.42, z0 + 0.27), axis='y', seg=8, mat='panel_dark')
     g.cyl(0.115, 1.75, at=(0, 2.4, z0 + 0.27), axis='y', seg=8, mat='gunmetal')
@@ -100,7 +108,7 @@ def wheel(p, x, y, r, w=0.42, mirror=True):
     p.cyl(r * 0.22, w + 0.1, at=(x, y, r), axis='x', seg=6, mat='panel', mirror=mirror)
 
 
-@model('titan', icon='titan')
+@model('titan', icon='titan', factions=True)
 def titan(m):
     """Titan: twin-gun heavy. Layered armour, armoured skirts, wide low turret with cheek pods."""
     b = m.part('body')
@@ -139,6 +147,11 @@ def titan(m):
     t.box((0.28, 0.05, 0.12), at=(0.5, 0.11, z0 + 0.85), mat='glow')
     antenna(t, (0.75, -1.8, z0 + 0.64), h=1.4)
     antenna(t, (-0.75, -1.8, z0 + 0.64), h=1.0, tip=False)
+    if m.faction == 1:
+        teeth(b, 2.58, 0.75, 3.0, n=6, size=0.5)
+        blade(t, (0.95, -1.5, z0 + 0.6), length=1.4, height=0.9, mirror=True, rot=(0, 0, -10))
+        spike(t, (1.3, 0.75, z0 + 0.6), r=0.14, h=0.6, rot=(-35, 0, 0), mat='team', mirror=True)
+        spike(b, (1.9, 2.1, 1.2), r=0.13, h=0.6, rot=(-55, 0, 0), mat='team', mirror=True)
 
     g = m.part('barrel', role='barrel', pivot=piv, travel=0.5)
     for s in (-1, 1):
@@ -148,7 +161,7 @@ def titan(m):
         g.cyl(0.13, 0.04, at=(s * 0.46, 4.67, z0 + 0.36), axis='y', seg=8, mat='glow')
 
 
-@model('artillery', icon='artillery')
+@model('artillery', icon='artillery', factions=True)
 def artillery(m):
     """Longbow: tracked gun carriage with a long elevated barrel, recoil spades and a loader cab."""
     b = m.part('body')
@@ -173,6 +186,11 @@ def artillery(m):
     headlights(b, 0.85, 1.84, 0.9)
     antenna(b, (-0.95, 0.55, 1.76), h=1.0)
     vents(b, (0.25, -1.1, 1.65), (0.6, 0.5), n=3)
+    if m.faction == 1:
+        teeth(b, 1.92, 0.6, 2.2, n=4, size=0.4)
+        blade(b, (-0.62, 0.6, 1.76), length=0.9, height=0.5)
+        blade(b, (0.74, -0.9, 2.05), length=1.0, height=0.55, mat='team')
+        blade(b, (-0.24, -0.9, 2.05), length=1.0, height=0.55, mat='team')
 
     g = m.part('barrel', role='barrel', pivot=(0.25, -0.5, 1.9), travel=0.7)
     elev = 26
@@ -191,7 +209,7 @@ def artillery(m):
     along(4.21, 0.16, 0.04, 'glow')
 
 
-@model('buggy', icon='buggy')
+@model('buggy', icon='buggy', factions=True)
 def buggy(m):
     """Lynx: fast scout. Exposed roll cage, long-travel suspension, pintle machine gun."""
     b = m.part('body')
@@ -217,6 +235,10 @@ def buggy(m):
     headlights(b, 0.46, 1.6, 0.74, w=0.2, h=0.1)
     b.box((0.9, 0.1, 0.16), at=(0, 1.66, 0.5), mat='gunmetal')                        # bull bar
     antenna(b, (-0.5, -1.3, 1.18), h=1.1)
+    if m.faction == 1:
+        teeth(b, 1.7, 0.5, 1.0, n=3, size=0.4)
+        blade(b, (0.0, -1.25, 1.18), length=0.8, height=0.55)
+        spike(b, (0.78, 1.5, 1.06), r=0.09, h=0.4, rot=(-60, 0, 0), mat='team', mirror=True)
 
     piv = (0, -0.3, 1.6)
     t = m.part('turret', role='turret', pivot=piv, travel=0.12)
@@ -229,7 +251,7 @@ def buggy(m):
     m.meta.update(muzzle=[0, 0.95, 1.8])
 
 
-@model('harvester', icon='harvester')
+@model('harvester', icon='harvester', factions=True)
 def harvester(m):
     """Six-wheel Aurium hauler: cab forward, open hopper, intake scoop with grinding teeth."""
     b = m.part('body')
@@ -263,6 +285,10 @@ def harvester(m):
     b.cyl(0.12, 0.9, at=(-1.0, 0.86, 2.6), seg=6, mat='gunmetal')                          # exhaust
     b.cyl(0.14, 0.1, at=(-1.0, 0.86, 3.06), seg=6, mat='black')
     b.box((0.3, 0.05, 0.16), at=(0.85, -2.26, 1.05), mat=glow(1.0, 0.25, 0.1), mirror=True)
+    if m.faction == 1:
+        for y in (-1.9, -1.2, -0.5, 0.2):
+            spike(b, (1.25, y, 2.28), r=0.12, h=0.42, rot=(0, 18, 0), mat='team', mirror=True)
+        blade(b, (0.7, 1.2, 2.32), length=0.9, height=0.5, mirror=True)
 
     # cargo heap: grows out of the hopper as it fills (game scales it vertically)
     c = m.part('cargo', role='cargo', pivot=(0, -0.72, 2.2), depth=0.85, show_preview=True)
@@ -277,7 +303,7 @@ def harvester(m):
     c.box((2.0, 2.6, 0.5), at=(0, -0.72, 1.75), mat=(0.08, 0.38, 0.42))
 
 
-@model('gunship', icon='gunship', ground=False, ao_dist=1.2)
+@model('gunship', icon='gunship', ground=False, ao_dist=1.2, factions=True)
 def gunship(m):
     """Kestrel: twin-fan VTOL gunship. Faceted fuselage, canted fan pods, chin gun, V tail."""
     b = m.part('body')
@@ -314,6 +340,10 @@ def gunship(m):
     b.pipe([(0.42, 0.6, -0.4), (0.5, 0.6, -0.86)], 0.04, mat='gunmetal', mirror=True)
     b.pipe([(0.42, -0.5, -0.4), (0.5, -0.5, -0.86)], 0.04, mat='gunmetal', mirror=True)
     b.box((0.1, 0.1, 0.08), at=(0, -0.3, 0.6), mat=glow(1.0, 0.25, 0.1))                    # beacon
+    if m.faction == 1:
+        spike(b, (0, 2.6, -0.1), r=0.14, h=0.9, rot=(-90, 0, 0), mat='gunmetal')
+        spike(b, (2.9, 0.3, 0.3), r=0.16, h=1.1, rot=(-78, 0, -20), mat='team', mirror=True)
+        blade(b, (0, -1.4, 0.55), length=1.3, height=0.6)
 
     for s, name in ((1, 'fan_r'), (-1, 'fan_l')):
         f = m.part(name, role='spin', pivot=(s * 2.25, 0.0, 0.4), speed=s * 26.0, follow=True)

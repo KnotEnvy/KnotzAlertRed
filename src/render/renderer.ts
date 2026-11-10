@@ -8,6 +8,7 @@ import type { ThemeId } from '../core/config';
 import { BUILDING_DEFS } from '../data/buildings';
 import type { Building } from '../sim/building';
 import type { Entity } from '../sim/entity';
+import type { WreckInfo } from '../sim/hooks';
 import type { World } from '../sim/world';
 import { Batch } from './batch';
 import { RtsCamera } from './camera';
@@ -53,6 +54,25 @@ class GlowPlugin extends MaterialPluginBase {
   }
 }
 
+/** A burnt-out hull (or a collapsing structure) left where something died. */
+interface Wreck {
+  info: WreckInfo;
+  mb: ModelBatch;
+  y: number;
+  /** Height above the ground and fall speed, for aircraft shot out of the sky. */
+  alt: number;
+  vy: number;
+  spin: number;
+  heading: number;
+  t: number;
+  life: number;
+  smokeT: number;
+}
+
+const WRECK_LIFE = 18;
+const COLLAPSE = 1.5; // seconds a structure takes to fall in
+const RUBBLE_LIFE = 55;
+
 /** Walk cycle: stride, pass, opposite stride, pass. Index 0 is the standing pose. */
 const WALK = [1, 0, 2, 0];
 
@@ -86,6 +106,8 @@ export class Renderer {
   private unitBatches = new Map<string, ModelBatch>();
   private buildingBatches = new Map<string, ModelBatch>();
   private crystals: Batch;
+  private wrecks: Wreck[] = [];
+  private rubble = new Map<number, Batch>();
   private ghostMeshes = new Map<string, Mesh>();
   private ghostMat: StandardMaterial;
   private ghostPad: Mesh;
@@ -147,7 +169,11 @@ export class Renderer {
     this.terrain = new TerrainView(scene, world.map, theme, this.objectMat, pack);
     for (const b of this.terrain.propBatches) this.shadows.addShadowCaster(b.mesh);
 
-    this.fx = new Fx(scene, (x, z) => world.groundY(x, z));
+    const chunk = buildModel(scene, pack, 'debris', 0).body;
+    chunk.material = this.objectMat;
+    chunk.receiveShadows = true;
+    this.shadows.addShadowCaster(chunk);
+    this.fx = new Fx(scene, (x, z) => world.groundY(x, z), chunk);
     this.fogView = new FogView(scene);
 
     const crystal = buildModel(scene, pack, 'crystal', 0).body;
@@ -263,8 +289,11 @@ export class Renderer {
 
     this.eachBatch((b) => b.begin());
     this.fx.markBatch.begin();
+    for (const b of this.rubble.values()) b.begin();
     this.drawUnits(world, dt);
     this.drawBuildings(world);
+    this.drawWrecks(world, dt);
+    for (const b of this.rubble.values()) b.end();
     this.drawSelection(world, view);
     this.drawProjectiles(world, dt);
     this.eachBatch((b) => b.end());
@@ -277,6 +306,9 @@ export class Renderer {
       const f = 0.55 + 0.6 * (n.amount / n.initial);
       const pulse = 0.9 + Math.sin(this.time * 2 + n.id) * 0.1;
       cb.push(n.x, world.groundY(n.x, n.z) - 0.05, n.z, n.rot, f, f * (0.85 + ((n.id * 37) % 10) * 0.03), f, pulse, pulse, pulse);
+      if (Math.random() < dt * 0.22 && world.fog.isVisible(n.x, n.z)) {
+        this.fx.sparkle(n.x + (Math.random() - 0.5) * 1.6, world.groundY(n.x, n.z) + 0.6 + Math.random() * 1.6, n.z + (Math.random() - 0.5) * 1.6, [0.35, 1.0, 1.1], 1);
+      }
     }
     cb.end();
 
@@ -468,6 +500,122 @@ export class Renderer {
     }
   }
 
+  /** Called by the sim hook when a vehicle or structure dies in view. */
+  addWreck(info: WreckInfo): void {
+    if (this.wrecks.length > 60) this.wrecks.shift();
+    const mb = info.kind === 'unit' ? this.unitBatch(info.model, info.team) : this.buildingBatch(info.model, info.team);
+    const building = info.kind === 'building';
+    this.wrecks.push({
+      info, mb,
+      y: this.world.groundY(info.x, info.z),
+      alt: info.alt,
+      vy: 0,
+      spin: info.alt > 0.5 ? (Math.random() < 0.5 ? -1 : 1) * (2.5 + Math.random() * 2) : 0,
+      heading: info.heading,
+      t: 0,
+      life: building ? COLLAPSE + RUBBLE_LIFE : WRECK_LIFE,
+      smokeT: 0,
+    });
+  }
+
+  private rubbleBatch(team: number): Batch {
+    let b = this.rubble.get(team);
+    if (!b) {
+      const mesh = buildModel(this.scene, this.pack, 'rubble', team).body;
+      mesh.material = this.objectMat;
+      mesh.receiveShadows = true;
+      this.shadows.addShadowCaster(mesh);
+      b = new Batch(mesh, 16);
+      b.begin();
+      this.rubble.set(team, b);
+    }
+    return b;
+  }
+
+  private drawWrecks(world: World, dt: number): void {
+    const fx = this.fx;
+    for (let i = this.wrecks.length - 1; i >= 0; i--) {
+      const w = this.wrecks[i];
+      w.t += dt;
+      if (w.t >= w.life) {
+        this.wrecks[i] = this.wrecks[this.wrecks.length - 1];
+        this.wrecks.pop();
+        continue;
+      }
+      const info = w.info;
+      const left = w.life - w.t;
+      if (info.kind === 'building') {
+        // the structure folds into the ground while the rubble pile rises out of the dust
+        const k = Math.min(1, w.t / COLLAPSE);
+        const sink = left < 4 ? (4 - left) * 0.3 : 0;
+        if (k < 1) {
+          const drop = k * k;
+          const tint = 0.75 - k * 0.5;
+          w.mb.body.push(info.x + (Math.random() - 0.5) * 0.18, w.y + 0.3 - drop * 1.2, info.z + (Math.random() - 0.5) * 0.18, 0, 1, 1 - drop * 0.92, 1, tint, tint * 0.95, tint * 0.9);
+          if (Math.random() < dt * 30) {
+            const a = Math.random() * Math.PI * 2;
+            const d = Math.random();
+            fx.dust(info.x + Math.cos(a) * info.w * 0.5 * d, w.y + 0.4, info.z + Math.sin(a) * info.h * 0.5 * d, 0.5, 0.47, 0.43);
+            fx.smoke(info.x + Math.cos(a) * info.w * 0.35 * d, w.y + 1, info.z + Math.sin(a) * info.h * 0.35 * d, 1.6);
+          }
+        }
+        const rise = Math.min(1, w.t / (COLLAPSE * 0.8));
+        this.rubbleBatch(info.team).push(info.x, w.y + 0.05 - sink, info.z, (info.x * 7 + info.z * 13) % 6.28, info.w * 0.46, (0.5 + Math.min(info.w, info.h) * 0.16) * rise, info.h * 0.46, 1, 1, 1);
+        w.smokeT -= dt;
+        if (w.smokeT <= 0 && w.t < 22) {
+          w.smokeT = 0.25 + w.t * 0.04;
+          fx.smoke(info.x + (Math.random() - 0.5) * info.w * 0.5, w.y + 0.8, info.z + (Math.random() - 0.5) * info.h * 0.5, w.t < 8 ? 1.5 : 1);
+        }
+        continue;
+      }
+
+      // vehicles: aircraft tumble out of the sky first, then every hull burns and finally sinks away
+      if (w.alt > 0.02) {
+        w.vy -= 22 * dt;
+        w.alt += w.vy * dt;
+        w.heading += w.spin * dt;
+        if (Math.random() < dt * 30) fx.trail(info.x, w.y + w.alt + 0.5, info.z);
+        if (w.alt <= 0.02) {
+          w.alt = 0;
+          fx.explosion(info.x, w.y + 0.6, info.z, info.w * 1.1);
+          fx.scorch(info.x, info.z, info.w * 1.6);
+          fx.shake(0.5);
+        }
+      }
+      const sink = left < 3.5 ? (3.5 - left) * (0.55 + info.w * 0.35) : 0;
+      const y = w.y + w.alt - sink;
+      const cool = Math.max(0, 1 - w.t / 5);
+      const r = 0.2 + cool * 0.3;
+      const g = 0.18 + cool * 0.09;
+      const b = 0.17;
+      w.mb.body.push(info.x, y, info.z, w.heading, 1, w.alt > 0 ? 1 : 0.9, 1, r, g, b);
+      const sh = Math.sin(w.heading);
+      const ch = Math.cos(w.heading);
+      for (const part of w.mb.parts) {
+        const role = part.info.role;
+        if (role === 'cargo') continue;
+        const p = part.info.pivot;
+        const px = info.x + p[0] * ch + p[2] * sh;
+        const pz = info.z - p[0] * sh + p[2] * ch;
+        // the turret is knocked askew and sits a little low on the burnt hull
+        const yaw = role === 'turret' || role === 'barrel' ? info.aim + 0.5 + (w.heading - info.heading) : w.heading;
+        part.batch.push(px, y + p[1] * 0.9, pz, yaw, 1, 0.9, 1, r, g, b);
+      }
+      w.smokeT -= dt;
+      if (w.smokeT <= 0 && w.t < 11 && w.alt <= 0.02) {
+        w.smokeT = 0.16 + w.t * 0.05;
+        fx.smoke(info.x + (Math.random() - 0.5) * info.w * 0.6, y + 1.1, info.z + (Math.random() - 0.5) * info.w * 0.6, w.t < 4 ? 1.4 : 0.9);
+      }
+    }
+  }
+
+  /** Ground ring that slowly turns (selection brackets, rally markers). */
+  private ring(x: number, y: number, z: number, size: number, rot: number, r: number, g: number, b: number, a: number): void {
+    const c = Math.cos(rot) * size;
+    const s = Math.sin(rot) * size;
+    this.fx.markBatch.pushBasis(x, y, z, c, 0, s, -s, 0, c, 0, 1, 0, r, g, b, a);
+  }
+
   private drawSelection(world: World, view: FrameView): void {
     const mark = this.fx.markBatch;
     for (const e of view.selection) {
@@ -477,7 +625,7 @@ export class Renderer {
       if (e.kind === 'building') {
         const b = e as Building;
         const s = Math.max(b.w, b.h) * CELL * 1.5;
-        mark.pushBasis(e.x, y, e.z, s, 0, 0, 0, 0, s, 0, 1, 0, col[0], col[1], col[2], 0.9);
+        this.ring(e.x, y, e.z, s, this.time * 0.25, col[0], col[1], col[2], 0.9);
         const wpn = b.def.weapon;
         if (wpn && b.team === TEAM_PLAYER) {
           const rs = (wpn.range + b.radius) * 2.27;
@@ -485,11 +633,11 @@ export class Renderer {
         }
         if (b.def.produces && b.team === TEAM_PLAYER && b.def.produces !== 'tech') {
           this.fx.segment(b.exitX, y + 0.3, b.exitZ, b.rallyX, world.groundY(b.rallyX, b.rallyZ) + 0.5, b.rallyZ, 0.08, 0.5, 1.4, 0.7, 0.7);
-          mark.pushBasis(b.rallyX, world.groundY(b.rallyX, b.rallyZ) + 0.25, b.rallyZ, 2.2, 0, 0, 0, 0, 2.2, 0, 1, 0, 0.5, 1.6, 0.8, 0.9);
+          this.ring(b.rallyX, world.groundY(b.rallyX, b.rallyZ) + 0.25, b.rallyZ, 2.2 + Math.sin(this.time * 4) * 0.2, -this.time * 1.5, 0.5, 1.6, 0.8, 0.9);
         }
       } else {
         const s = e.radius * 2.7 + 0.5;
-        mark.pushBasis(e.x, y, e.z, s, 0, 0, 0, 0, s, 0, 1, 0, col[0], col[1], col[2], 0.95);
+        this.ring(e.x, y, e.z, s, this.time * 0.9 + e.id, col[0], col[1], col[2], 0.95);
       }
     }
     const rt = view.reticle;
@@ -497,7 +645,7 @@ export class Renderer {
       const y = world.groundY(rt.x, rt.z) + 0.3;
       const s = Math.max(1.5, rt.radius) * 2.27;
       const pulse = 0.75 + Math.sin(this.time * 8) * 0.25;
-      mark.pushBasis(rt.x, y, rt.z, s, 0, 0, 0, 0, s, 0, 1, 0, rt.color[0] * 1.8, rt.color[1] * 1.8, rt.color[2] * 1.8, pulse);
+      this.ring(rt.x, y, rt.z, s, this.time * 1.2, rt.color[0] * 1.8, rt.color[1] * 1.8, rt.color[2] * 1.8, pulse);
       if (rt.range > 0) {
         const rs = rt.range * 2.27;
         mark.pushBasis(rt.fromX, world.groundY(rt.fromX, rt.fromZ) + 0.25, rt.fromZ, rs, 0, 0, 0, 0, rs, 0, 1, 0, 1, 1, 1, 0.22);
@@ -512,7 +660,9 @@ export class Renderer {
       if (p.type === 'shell') {
         const l = p.big ? 2.6 : 1.8;
         fx.segment(p.x - p.dx * l, p.y - p.dy * l, p.z - p.dz * l, p.x, p.y, p.z, p.big ? 0.3 : 0.22, 2.6, 1.9, 0.8, 1);
+        fx.glowPoint(p.x, p.y, p.z, p.big ? 2.0 : 1.4, 2.2, 1.4, 0.5, 0.7);
       } else if (p.type === 'rocket') {
+        fx.glowPoint(p.x - p.dx * 1.2, p.y - p.dy * 1.2, p.z - p.dz * 1.2, 1.5, 2.2, 1.3, 0.4, 0.8);
         fx.segment(p.x - p.dx * 1.2, p.y - p.dy * 1.2, p.z - p.dz * 1.2, p.x, p.y, p.z, 0.2, 2.2, 2.0, 1.6, 1);
         p.trailT -= dt;
         if (p.trailT <= 0) {
@@ -522,6 +672,7 @@ export class Renderer {
       } else {
         const l = p.big ? 1.4 : 0.8;
         fx.segment(p.x - p.dx * l, p.y - p.dy * l, p.z - p.dz * l, p.x, p.y, p.z, p.big ? 0.42 : 0.3, 2.4, 1.3, 0.5, 1);
+        fx.glowPoint(p.x, p.y, p.z, p.big ? 2.4 : 1.5, 2.2, 1.1, 0.35, 0.7);
         p.trailT -= dt;
         if (p.trailT <= 0) {
           p.trailT = p.big ? 0.035 : 0.06;
@@ -576,6 +727,7 @@ export class Renderer {
   }
 
   dispose(): void {
+    this.wrecks.length = 0;
     this.scene.dispose();
     this.engine.dispose();
   }

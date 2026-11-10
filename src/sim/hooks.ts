@@ -5,6 +5,22 @@
 export type NoticeKind = 'info' | 'good' | 'warn' | 'bad';
 export type Rgb = readonly [number, number, number];
 
+/** What a destroyed vehicle or structure leaves behind (purely visual). */
+export interface WreckInfo {
+  kind: 'unit' | 'building';
+  model: string;
+  team: number;
+  x: number;
+  z: number;
+  /** Height above the ground when destroyed (aircraft). */
+  alt: number;
+  heading: number;
+  aim: number;
+  /** Footprint in world units (structures) or body radius (units). */
+  w: number;
+  h: number;
+}
+
 export interface Hooks {
   sound(id: string, x?: number, z?: number, vol?: number): void;
   voice(line: string): void;
@@ -23,6 +39,7 @@ export interface Hooks {
   text(x: number, y: number, z: number, str: string, color: string): void;
   shake(x: number, z: number, amount: number): void;
   scorch(x: number, z: number, size: number): void;
+  wreck(info: WreckInfo): void;
 }
 
 export const NULL_HOOKS: Hooks = {
@@ -43,4 +60,5 @@ export const NULL_HOOKS: Hooks = {
   text() {},
   shake() {},
   scorch() {},
+  wreck() {},
 };

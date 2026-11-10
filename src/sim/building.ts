@@ -1,3 +1,4 @@
+import { MUZZLES } from '../data/muzzles';
 import { CELL, TEAM_NEUTRAL, TEAM_PLAYER, WORLD } from '../core/config';
 import { clamp, turnToward, wrapAngle, yawOf } from '../core/math';
 import type { BuildingDef } from '../data/types';
@@ -19,6 +20,7 @@ export class Building extends Entity {
   target: Entity | null = null;
   private scanT = 0;
   exitX = 0;
+  private burstSide = 1;
   exitZ = 0;
   rallyX = 0;
   rallyZ = 0;
@@ -140,11 +142,17 @@ export class Building extends Entity {
     if (Math.abs(wrapAngle(aim - this.turretYaw)) < 0.14 && this.cooldown <= 0) {
       this.cooldown = wpn.cooldown;
       this.recoil = 1;
+      const m0 = MUZZLES[this.def.model];
       const top = wpn.projectile === 'arc';
-      const f = top ? 0 : 1.9;
-      const mx = this.x + Math.sin(this.turretYaw) * f;
-      const mz = this.z + Math.cos(this.turretYaw) * f;
-      const my = w.groundY(this.x, this.z) + this.height * (top ? 0.95 : 0.62);
+      const f = m0 ? m0[0] : top ? 0 : 1.9;
+      let lat = 0;
+      if (m0?.[2]) {
+        this.burstSide = -this.burstSide;
+        lat = this.burstSide * m0[2];
+      }
+      const mx = this.x + Math.sin(this.turretYaw) * f + Math.cos(this.turretYaw) * lat;
+      const mz = this.z + Math.cos(this.turretYaw) * f - Math.sin(this.turretYaw) * lat;
+      const my = w.groundY(this.x, this.z) + (m0 ? m0[1] + 0.3 : this.height * (top ? 0.95 : 0.62));
       w.fireWeapon(this, wpn, t, mx, my, mz, this.turretYaw, 1);
     }
   }

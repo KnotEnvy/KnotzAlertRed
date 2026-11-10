@@ -270,6 +270,9 @@ export class Game {
         if (d < range && seen(x, z)) fx.shake(amount * (1 - d / range));
       },
       scorch: (x, z, size) => fx.scorch(x, z, size),
+      wreck: (info) => {
+        if (seen(info.x, info.z)) this.renderer.addWreck(info);
+      },
     };
   }
 

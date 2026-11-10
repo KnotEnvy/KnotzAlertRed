@@ -1,8 +1,11 @@
 # KnotZ: Alert Red — build log
 
 A 3D browser RTS: sidebar base-building and tank warfare, plus hero commanders, veterancy,
-capturable outposts and requisition-bought support powers. Vite + TypeScript + Babylon.js,
-no downloaded game assets (models, textures, icons, sound and music are all procedural).
+capturable outposts and requisition-bought support powers. Vite + TypeScript + Babylon.js.
+Models are built in Blender from scripts in `assets/`, sound and music are synthesised at
+runtime, and the 2D art in `public/art/` is original.
+
+Round 1 (sections 1–9) built the playable game. Round 2 (section 10) is the presentation pass.
 
 Legend: `[x]` done · `[~]` partial · `[ ]` not started
 
@@ -84,6 +87,34 @@ Legend: `[x]` done · `[~]` partial · `[ ]` not started
 - Symbol-font glyphs rendered as boxes on systems without those fonts → replaced with inline SVG icons
 - Pathfinding ran ~7x slower than necessary (heap Dijkstra → bucket queue, local constants in hot loops)
 - Armor Drop refused clicks on a blocked cell instead of snapping to open ground beside it
+
+## 10. Round 2 — presentation pass
+
+### Models and world (Blender)
+- [x] Headless Blender pipeline: Python modelling kit, binary model pack, contact-sheet and portrait renderer (`npm run assets`, see `assets/README.md`)
+- [x] All 9 units, 3 heroes, 12 structures and the scenery rebuilt as Blender models (53 meshes with faction variants) with baked ambient occlusion
+- [x] Palette-slot colouring: one mesh per model, recoloured per faction and per battlefield theme at load
+- [x] Crimson Dominion variants with their own silhouette (blades, ram teeth, horned towers, violet arc pylons)
+- [x] Separate recoiling barrels, spinning rotors / radars / containment rings, a nodding pump jack, infantry walk cycles
+- [x] Weapons fire from the real muzzle of each model (`src/data/muzzles.ts`)
+- [x] HUD portraits pre-rendered in Blender instead of at match start (faster loading)
+- [x] Faceted low-poly terrain with a scenery skirt beyond the map edge; themed trees, rocks and scrub
+- [x] Lighting rebudgeted under the material's diffuse clamp — cast shadows are visible for the first time
+
+### Effects
+- [x] Explosions: star flash, light thrown on the ground, shockwave, rolling smoke column, embers, tumbling lit debris
+- [x] Muzzle flame tongues, impact flashes, glowing projectile heads
+- [x] Burnt-out wrecks that smoulder and sink; aircraft fall out of the sky; structures collapse into rubble
+- [x] Rotating bracket selection rings, pulsing rally markers, sparkling Aurium
+
+### Interface
+- [ ] Main menu, loading screen, HUD, overlays, pause / settings, field manual, results screens (in progress)
+
+### Sound
+- [ ] Mix bus, layered weapons and explosions, adaptive music, announcer earcons, sound test page (in progress)
+
+### Verification
+- [ ] typecheck, build, smoke, full `npm run verify` on the merged tree
 
 ## Ideas for later
 - [ ] Naval / amphibious units and bridges
