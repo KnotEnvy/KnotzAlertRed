@@ -108,13 +108,33 @@ Legend: `[x]` done · `[~]` partial · `[ ]` not started
 - [x] Rotating bracket selection rings, pulsing rally markers, sparkling Aurium
 
 ### Interface
-- [ ] Main menu, loading screen, HUD, overlays, pause / settings, field manual, results screens (in progress)
+- [x] Bundled typefaces (Chakra Petch, Barlow — SIL OFL), cut-corner panel language, expanded inline SVG icon set, custom SVG cursors
+- [x] Main menu: key art backdrop with motion, logo lockup, painted commander cards with a kit profile, battlefield picture cards, difficulty pips, settings and field manual from the menu
+- [x] Loading screen with the battlefield's art, the commander, rotating tips and a segmented progress bar
+- [x] HUD: ticking credits, power gauge with shortage states, requisition pips, tabbed production with progress sweeps and lock reasons, an always-visible queue panel, hero panel with painted portrait / XP / cooldown sweeps, structured tooltips, notices with repeat counts, attack-direction edge flash
+- [x] In-world overlay: segmented health bars that quieten in crowds, veterancy chevrons, hero badges, status chips, capture dials, floating text, bracketed drag box
+- [x] Pause and grouped settings, field manual, victory / defeat screens with art backdrops and counting stats, restyled fatal-error box
 
 ### Sound
-- [ ] Mix bus, layered weapons and explosions, adaptive music, announcer earcons, sound test page (in progress)
+- [x] Sample-level synthesis engine: 63 layered recipes pre-rendered as seeded variations and loudness-normalised (still no audio files)
+- [x] Mix bus: effects / UI / ambience / music buses, per-battlefield reverb, compressor and a −1 dBFS safety ceiling, priority voice stealing, distance low-pass
+- [x] Adaptive generative music: menu, calm, tension and combat states that change on bar lines, driven by measured combat intensity; victory and defeat cues; per-battlefield scales and instruments
+- [x] Ambience beds per battlefield, announcer earcons for every category with optional speech
+- [x] Interface, economy and event cues (build start, upgrade, power, capture lost, insufficient funds, objective, collapse…)
+- [x] `?soundboard=1` sound test page and `npm run audio:render` (WAV + spectrogram + loudness report per sound, mix stress tests)
 
-### Verification
-- [ ] typecheck, build, smoke, full `npm run verify` on the merged tree
+### Verification (merged tree, 2026-11-10)
+- [x] `npm run typecheck`, `npm run build`
+- [x] `npm run smoke` — 31/31 on the dev server and on the production bundle (`PREVIEW=1`), zero runtime problems
+- [x] `npm run verify` — input 52/52, HUD 97/97, combat 46/46, zero runtime problems or frame exceptions
+- [x] `npm run audio:render` — 78 items, none silent or clipping; mix stress tests (40 mixed, 40 close, 200-trigger flood) stay under the −1 dBFS ceiling
+- [x] `npm run simtest`, `npm run movetest`
+- [x] Smoke test's "combat loop resolves kills" check made deterministic (it failed about one run in six since round 1)
+
+### Not verifiable by automation — needs a human playtest
+- How any of the audio actually sounds (music taste, weapon identity, explosion weight, music/effects balance, announcer voice)
+- Frame rate on a real GPU (the suites run software WebGL)
+- The custom mouse cursors (screenshots do not capture the pointer)
 
 ## Ideas for later
 - [ ] Naval / amphibious units and bridges

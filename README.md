@@ -23,6 +23,8 @@ Other scripts:
 | `npm run typecheck` | `tsc --noEmit` with strict settings |
 | `npm run assets` | Rebuild the model pack and HUD portraits in headless Blender (`BLENDER=/path/to/blender` if it is not found) |
 | `npm run showcase` | Art review: lines up every unit and structure and writes close-up screenshots to `scripts/out/` (`THEME=frost` etc.); `node scripts/battleshot.mjs` stages a battle |
+| `npm run audio:render` | Renders every sound and music state offline and writes WAVs, spectrograms and a loudness report to `scripts/out/audio/`; fails if anything is silent or clips |
+| `node scripts/ui-shots.mjs` | Screenshot tour of every interface surface at three resolutions (`scripts/out/ui/`) |
 | `npm run simtest` | Headless simulation soak: the AI plays a scripted opponent, no rendering |
 | `npm run movetest` | Marches a mixed group across ten generated maps and reports arrivals (pathfinding regression check) |
 | `npm run smoke` | Quick headless-browser pass through the menu, HUD, queues, commands, abilities, powers, combat and the results screens. `SHOTS=1` writes screenshots to `scripts/out/`, `PREVIEW=1` tests the production bundle |
@@ -83,8 +85,9 @@ src/
   render/   Babylon.js scene: model-pack loader, faceted terrain, thin-instance batches,
             particles and debris, wrecks, fog sheet, 2D overlay
   input/    mouse + keyboard: selection, context commands, placement and targeting modes
-  ui/       DOM HUD, minimap, menus
-  audio/    synthesised effects, generative music, announcer
+  ui/       DOM HUD, minimap, menus, cursors, styles
+  audio/    synthesis engine, sound recipes, mixer, adaptive music, ambience, announcer,
+            sound test page
   game.ts   wires one match together; main.ts handles menu ↔ match flow
 assets/     Blender modelling kit and model sources (Python) — the art pipeline
 public/     models/models.kzm (built model pack), art/ (key art, portraits, backdrops)
@@ -98,5 +101,7 @@ unit type (hull, turret, barrel…) costs one draw call regardless of how many a
 
 For automation, a running match is exposed as `window.__game` and
 `?autostart=1&hero=nyx&difficulty=hard&theme=frost&seed=42` skips the menu.
+`?soundboard=1` opens the sound test page: every effect, each music state with an intensity
+slider, and the mix stress test.
 
 Progress and the backlog live in [TASKS.md](TASKS.md).

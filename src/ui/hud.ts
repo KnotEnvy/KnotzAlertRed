@@ -709,8 +709,9 @@ export class Hud {
     setText(e.hpText, h ? `${Math.ceil(h.hp)} / ${Math.round(h.maxHp)}` : 'Reviving');
     const lo = HERO_XP[p.heroLevel - 1] ?? 0;
     const hi = HERO_XP[p.heroLevel];
-    setVar(e.xp, '--f', hi ? Math.min(1, (p.heroXp - lo) / (hi - lo)).toFixed(3) : '1');
-    setText(e.xpText, hi ? `${Math.floor(p.heroXp - lo)}/${hi - lo}` : 'MAX');
+    const gained = Math.max(0, p.heroXp - lo);
+    setVar(e.xp, '--f', hi ? Math.min(1, gained / (hi - lo)).toFixed(3) : '1');
+    setText(e.xpText, hi ? `${Math.floor(gained)}/${hi - lo}` : 'MAX');
     p.heroDef.abilities.forEach((a, i) => {
       const b = e.abilities[i];
       const locked = p.heroLevel < a.unlockLevel;
