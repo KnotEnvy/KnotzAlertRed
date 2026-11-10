@@ -8,3 +8,6 @@ scripts/verify/hud
 scripts/verify/input
 scripts/verify/combat
 scripts/verify/shots
+__pycache__/
+*.blend1
+assets/out/

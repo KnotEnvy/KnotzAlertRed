@@ -1,6 +1,6 @@
 import {
   Color3, Color4, DefaultRenderingPipeline, DirectionalLight, Engine, HemisphericLight, ImageProcessingConfiguration,
-  MeshBuilder, Scene, ShadowGenerator, StandardMaterial, Vector3,
+  MaterialPluginBase, MeshBuilder, Scene, ShadowGenerator, StandardMaterial, Vector3,
 } from './babylon';
 import type { Mesh } from './babylon';
 import { CELL, TEAM_COLORS, TEAM_NEUTRAL, TEAM_PLAYER } from '../core/config';
@@ -13,16 +13,48 @@ import { Batch } from './batch';
 import { RtsCamera } from './camera';
 import { FogView } from './fogview';
 import { Fx } from './fx';
-import { buildBuildingModel, buildCrystalModel, buildUnitModel } from './models';
-import type { ModelParts } from './models';
+import type { ModelPack } from './modelpack';
+import { buildModel } from './models';
+import type { ModelParts, PartInst } from './models';
 import { THEMES, TerrainView } from './terrain';
 import type { Theme } from './terrain';
 
 interface ModelBatch {
-  parts: ModelParts;
+  model: ModelParts;
   body: Batch;
-  turret: Batch | null;
+  /** Alternate body poses (walk cycle). */
+  frames: Batch[];
+  parts: { info: PartInst; batch: Batch }[];
 }
+
+/**
+ * Vertices written with alpha 0 are emissive: they skip lighting and shadows and go to the
+ * frame buffer at full strength (lights, windows, crystals), which is what feeds the bloom.
+ */
+class GlowPlugin extends MaterialPluginBase {
+  constructor(material: StandardMaterial) {
+    super(material, 'KzGlow', 200, { KZGLOW: false });
+    this._enable(true);
+  }
+  override prepareDefines(defines: Record<string, unknown>): void {
+    defines.KZGLOW = true;
+  }
+  override getClassName(): string {
+    return 'KzGlowPlugin';
+  }
+  override getCustomCode(shaderType: string): Record<string, string> | null {
+    if (shaderType !== 'fragment') return null;
+    return {
+      CUSTOM_FRAGMENT_BEFORE_FRAGCOLOR: `
+#if defined(KZGLOW) && (defined(VERTEXCOLOR) || defined(INSTANCESCOLOR))
+  color.rgb = mix(color.rgb, vColor.rgb, 1.0 - clamp(vColor.a, 0.0, 1.0));
+#endif`,
+    };
+  }
+}
+
+/** Walk cycle: stride, pass, opposite stride, pass. Index 0 is the standing pose. */
+const WALK = [1, 0, 2, 0];
 
 export interface Ghost {
   defId: string;
@@ -66,6 +98,7 @@ export class Renderer {
     readonly canvas: HTMLCanvasElement,
     private world: World,
     themeId: ThemeId,
+    readonly pack: ModelPack,
   ) {
     this.theme = THEMES[themeId] ?? THEMES.verdant;
     const theme = this.theme;
@@ -86,12 +119,14 @@ export class Renderer {
     hemi.diffuse = new Color3(theme.sky[0], theme.sky[1], theme.sky[2]);
     hemi.groundColor = new Color3(theme.ground[0], theme.ground[1], theme.ground[2]);
     hemi.specular = new Color3(0, 0, 0);
-    hemi.intensity = 0.95;
+    // StandardMaterial clamps summed diffuse light at 1, so the two lights are budgeted to peak
+    // just under it: anything brighter flattens the shading and hides cast shadows entirely.
+    hemi.intensity = 0.55;
 
     this.sun = new DirectionalLight('sun', new Vector3(-0.55, -1, 0.42).normalize(), scene);
     this.sun.diffuse = new Color3(theme.sun[0], theme.sun[1], theme.sun[2]);
     this.sun.specular = new Color3(theme.sun[0] * 0.6, theme.sun[1] * 0.6, theme.sun[2] * 0.6);
-    this.sun.intensity = 1.75;
+    this.sun.intensity = 0.62;
     this.sun.autoUpdateExtends = false;
     this.sun.autoCalcShadowZBounds = false;
     this.sun.shadowMinZ = 10;
@@ -102,20 +137,23 @@ export class Renderer {
     this.shadows.filteringQuality = ShadowGenerator.QUALITY_MEDIUM;
     this.shadows.bias = 0.0012;
     this.shadows.normalBias = 0.035;
-    this.shadows.setDarkness(0.38);
+    this.shadows.setDarkness(0.28);
 
     this.objectMat = new StandardMaterial('objects', scene);
     this.objectMat.specularColor = new Color3(0.16, 0.16, 0.16);
     this.objectMat.specularPower = 24;
+    new GlowPlugin(this.objectMat);
 
-    this.terrain = new TerrainView(scene, world.map, theme, this.objectMat);
+    this.terrain = new TerrainView(scene, world.map, theme, this.objectMat, pack);
     for (const b of this.terrain.propBatches) this.shadows.addShadowCaster(b.mesh);
 
     this.fx = new Fx(scene, (x, z) => world.groundY(x, z));
     this.fogView = new FogView(scene);
 
-    const crystal = buildCrystalModel(scene);
+    const crystal = buildModel(scene, pack, 'crystal', 0).body;
     crystal.material = this.objectMat;
+    crystal.receiveShadows = true;
+    this.shadows.addShadowCaster(crystal);
     this.crystals = new Batch(crystal, 128);
 
     this.ghostMat = new StandardMaterial('ghost', scene);
@@ -143,7 +181,7 @@ export class Renderer {
     const ip = this.pipeline.imageProcessing;
     ip.toneMappingEnabled = true;
     ip.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-    ip.exposure = 1.5;
+    ip.exposure = 2.0;
     ip.contrast = 1.18;
     ip.vignetteEnabled = true;
     ip.vignetteWeight = 1.6;
@@ -165,7 +203,7 @@ export class Renderer {
     const key = `${model}:${team}`;
     let mb = this.unitBatches.get(key);
     if (!mb) {
-      mb = this.makeBatch(buildUnitModel(this.scene, model, team));
+      mb = this.makeBatch(buildModel(this.scene, this.pack, model, team));
       this.unitBatches.set(key, mb);
     }
     return mb;
@@ -175,20 +213,35 @@ export class Renderer {
     const key = `${model}:${team}`;
     let mb = this.buildingBatches.get(key);
     if (!mb) {
-      mb = this.makeBatch(buildBuildingModel(this.scene, model, team));
+      mb = this.makeBatch(buildModel(this.scene, this.pack, model, team));
       this.buildingBatches.set(key, mb);
     }
     return mb;
   }
 
-  private makeBatch(parts: ModelParts): ModelBatch {
+  private makeBatch(model: ModelParts): ModelBatch {
     const setup = (m: Mesh) => {
       m.material = this.objectMat;
       m.receiveShadows = true;
       this.shadows.addShadowCaster(m);
       return new Batch(m, 16);
     };
-    return { parts, body: setup(parts.body), turret: parts.turret ? setup(parts.turret) : null };
+    return {
+      model,
+      body: setup(model.body),
+      frames: model.frames.map(setup),
+      parts: model.parts.map((info) => ({ info, batch: setup(info.mesh) })),
+    };
+  }
+
+  private eachBatch(fn: (b: Batch) => void): void {
+    for (const map of [this.unitBatches, this.buildingBatches]) {
+      for (const mb of map.values()) {
+        fn(mb.body);
+        for (const f of mb.frames) fn(f);
+        for (const p of mb.parts) fn(p.batch);
+      }
+    }
   }
 
   /** Build every model up front so the first battle does not hitch. */
@@ -208,36 +261,22 @@ export class Renderer {
     this.cam.update(dt, this.fx.shakeAmount, w, h);
     this.updateSun();
 
-    for (const mb of this.unitBatches.values()) {
-      mb.body.begin();
-      mb.turret?.begin();
-    }
-    for (const mb of this.buildingBatches.values()) {
-      mb.body.begin();
-      mb.turret?.begin();
-    }
+    this.eachBatch((b) => b.begin());
     this.fx.markBatch.begin();
     this.drawUnits(world, dt);
     this.drawBuildings(world);
     this.drawSelection(world, view);
     this.drawProjectiles(world, dt);
-    for (const mb of this.unitBatches.values()) {
-      mb.body.end();
-      mb.turret?.end();
-    }
-    for (const mb of this.buildingBatches.values()) {
-      mb.body.end();
-      mb.turret?.end();
-    }
+    this.eachBatch((b) => b.end());
     this.fx.markBatch.end();
 
     // crystals
     const cb = this.crystals;
     cb.begin();
     for (const n of world.nodes) {
-      const f = 0.36 + 0.36 * (n.amount / n.initial);
-      const pulse = 0.92 + Math.sin(this.time * 2 + n.id) * 0.08;
-      cb.push(n.x, world.groundY(n.x, n.z) - 0.1, n.z, n.rot, f, f, f, pulse, pulse, pulse);
+      const f = 0.55 + 0.6 * (n.amount / n.initial);
+      const pulse = 0.9 + Math.sin(this.time * 2 + n.id) * 0.1;
+      cb.push(n.x, world.groundY(n.x, n.z) - 0.05, n.z, n.rot, f, f * (0.85 + ((n.id * 37) % 10) * 0.03), f, pulse, pulse, pulse);
     }
     cb.end();
 
@@ -309,24 +348,44 @@ export class Renderer {
       }
       // foot heroes are drawn larger than life so they read at a glance
       const s = (u.dropT > 0 ? 1 : Math.min(1, 0.4 + u.age * 2.4)) * (u.hero && infantry ? 1.3 : 1);
-      mb.body.push(u.x, y, u.z, u.heading, s, s, s, r, g, b);
+      let body = mb.body;
+      if (mb.frames.length && u.moving) {
+        const f = WALK[Math.floor(u.age * 7.5 + u.id * 0.37) & 3];
+        if (f > 0 && f <= mb.frames.length) body = mb.frames[f - 1];
+      }
+      body.push(u.x, y, u.z, u.heading, s, s, s, r, g, b);
 
-      const tb = mb.turret;
-      if (tb) {
-        const p = mb.parts.pivot;
+      if (mb.parts.length) {
         const sh = Math.sin(u.heading);
         const ch = Math.cos(u.heading);
-        const px = u.x + (p[0] * ch + p[2] * sh) * s;
-        const pz = u.z + (-p[0] * sh + p[2] * ch) * s;
-        const py = y + p[1] * s;
-        if (mb.parts.mode === 'aim') {
-          const k = u.recoil * 0.32;
-          tb.push(px - Math.sin(u.turretYaw) * k, py, pz - Math.cos(u.turretYaw) * k, u.turretYaw, s, s, s, r, g, b);
-        } else if (mb.parts.mode === 'spin') {
-          tb.push(px, py, pz, this.time * mb.parts.spin + u.id, s, s, s, r, g, b);
-        } else if (mb.parts.mode === 'cargo') {
-          const fill = u.cargo / u.capacity(world);
-          if (fill > 0.03) tb.push(px, py - 0.75 + fill * 0.75, pz, u.heading, 1, 0.35 + fill * 0.65, 1, 1, 1, 1);
+        for (const part of mb.parts) {
+          const p = part.info.pivot;
+          const meta = part.info.meta;
+          const px = u.x + (p[0] * ch + p[2] * sh) * s;
+          const pz = u.z + (-p[0] * sh + p[2] * ch) * s;
+          const py = y + p[1] * s;
+          switch (part.info.role) {
+            case 'turret':
+            case 'barrel': {
+              const k = u.recoil * ((meta.travel as number | undefined) ?? (part.info.role === 'barrel' ? 0.4 : 0.1)) * s;
+              part.batch.push(px - Math.sin(u.turretYaw) * k, py, pz - Math.cos(u.turretYaw) * k, u.turretYaw, s, s, s, r, g, b);
+              break;
+            }
+            case 'spin': {
+              const bob = (meta.bob as number | undefined) ?? 0;
+              const yaw = meta.follow ? u.heading : 0;
+              part.batch.push(px, py + (bob ? Math.sin(this.time * 2.1 + u.id) * bob : 0), pz, yaw + this.time * ((meta.speed as number | undefined) ?? 1) + u.id, s, s, s, r, g, b);
+              break;
+            }
+            case 'cargo': {
+              const fill = u.cargo / u.capacity(world);
+              const drop = (meta.depth as number | undefined) ?? 0.75;
+              if (fill > 0.03) part.batch.push(px, py - drop * (1 - fill), pz, u.heading, 1, 0.35 + fill * 0.65, 1, 1, 1, 1);
+              break;
+            }
+            default:
+              part.batch.push(px, py, pz, u.heading, s, s, s, r, g, b);
+          }
         }
       }
 
@@ -370,14 +429,31 @@ export class Renderer {
         bl = 1.3;
       }
       mb.body.push(b.x, y, b.z, 0, 1, rise, 1, r, g, bl);
-      const tb = mb.turret;
-      if (tb && b.rise >= 1) {
-        const p = mb.parts.pivot;
-        if (mb.parts.mode === 'aim') {
-          const k = b.recoil * 0.35;
-          tb.push(b.x + p[0] - Math.sin(b.turretYaw) * k, y + p[1], b.z + p[2] - Math.cos(b.turretYaw) * k, b.turretYaw, 1, 1, 1, r, g, bl);
-        } else {
-          tb.push(b.x + p[0], y + p[1] + (b.def.id === 'obelisk' ? Math.sin(this.time * 1.5) * 0.3 : 0), b.z + p[2], this.time * mb.parts.spin, 1, 1, 1, r, g, bl);
+      if (b.rise >= 1) {
+        for (const part of mb.parts) {
+          const p = part.info.pivot;
+          const meta = part.info.meta;
+          switch (part.info.role) {
+            case 'turret':
+            case 'barrel': {
+              const k = b.recoil * ((meta.travel as number | undefined) ?? (part.info.role === 'barrel' ? 0.45 : 0.1));
+              part.batch.push(b.x + p[0] - Math.sin(b.turretYaw) * k, y + p[1], b.z + p[2] - Math.cos(b.turretYaw) * k, b.turretYaw, 1, 1, 1, r, g, bl);
+              break;
+            }
+            case 'rock': {
+              // see-saw about the model's X axis (pump jacks)
+              const a = Math.sin(this.time * ((meta.speed as number | undefined) ?? 1.5) + b.id) * ((meta.amp as number | undefined) ?? 0.3);
+              const ca = Math.cos(a);
+              const sa = Math.sin(a);
+              part.batch.pushBasis(b.x + p[0], y + p[1], b.z + p[2], 1, 0, 0, 0, ca, sa, 0, -sa, ca, r, g, bl);
+              break;
+            }
+            default: {
+              const bob = (meta.bob as number | undefined) ?? 0;
+              const speed = b.offline ? 0 : ((meta.speed as number | undefined) ?? 1);
+              part.batch.push(b.x + p[0], y + p[1] + (bob ? Math.sin(this.time * 1.5 + b.id) * bob : 0), b.z + p[2], this.time * speed + (speed ? b.id : 0), 1, 1, 1, r, g, bl);
+            }
+          }
         }
       }
       if (b.def.capturable) {
@@ -465,8 +541,9 @@ export class Renderer {
     const def = BUILDING_DEFS[ghost.defId];
     let mesh = this.ghostMeshes.get(ghost.defId);
     if (!mesh) {
-      const parts = buildBuildingModel(this.scene, def.model, TEAM_PLAYER);
-      parts.turret?.dispose();
+      const parts = buildModel(this.scene, this.pack, def.model, TEAM_PLAYER);
+      for (const p of parts.parts) p.mesh.dispose();
+      for (const f of parts.frames) f.dispose();
       mesh = parts.body;
       mesh.material = this.ghostMat;
       mesh.useVertexColors = false;

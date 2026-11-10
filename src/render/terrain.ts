@@ -1,13 +1,15 @@
-import { Color3, DynamicTexture, Mesh, MeshBuilder, StandardMaterial, VertexData } from './babylon';
+import { Color3, Mesh, MeshBuilder, StandardMaterial, VertexData } from './babylon';
 import type { Scene } from './babylon';
-import { CELL, GRID, WORLD } from '../core/config';
+import { GRID, WORLD } from '../core/config';
 import type { ThemeId } from '../core/config';
 import { fbm } from '../core/rng';
-import { T_DIRT, T_FOREST, T_ROCK, T_WATER } from '../sim/map';
+import { T_DIRT, T_FOREST, T_GRASS, T_ROCK, T_WATER } from '../sim/map';
 import type { GameMap } from '../sim/map';
 import { Batch } from './batch';
-import { buildBushModel, buildRockModel, buildTreeModel } from './models';
-import type { Col } from './modelkit';
+import type { ModelPack } from './modelpack';
+import { buildModel } from './models';
+
+export type Col = readonly [number, number, number];
 
 export interface Theme {
   name: string;
@@ -60,157 +62,153 @@ export class TerrainView {
   /** Pre-rendered top-down image of the terrain for the minimap. */
   readonly minimapImage: HTMLCanvasElement;
 
-  constructor(scene: Scene, map: GameMap, theme: Theme, objectMaterial: StandardMaterial) {
-    const n = GRID * 2; // quads per side (1 world unit each)
+  constructor(scene: Scene, map: GameMap, theme: Theme, objectMaterial: StandardMaterial, pack: ModelPack) {
+    // Faceted low-poly ground: a jittered 2-unit grid, flat-shaded, one colour per triangle.
+    // A skirt continues the landscape past the playable area so the map never ends in a void.
+    const STEP = 2;
+    const SKIRT = 26; // cells of scenery beyond each edge
+    const n = GRID + SKIRT * 2;
     const verts = n + 1;
-    const positions = new Float32Array(verts * verts * 3);
-    const colors = new Float32Array(verts * verts * 4);
-    const uvs = new Float32Array(verts * verts * 2);
-    const indices = new Uint32Array(n * n * 6);
-
-    const typeColor = (t: number): Col => {
-      if (t === T_DIRT) return theme.dirt;
-      if (t === T_ROCK) return theme.rock;
-      if (t === T_WATER) return theme.shore;
-      if (t === T_FOREST) return theme.forest;
-      return theme.grass;
+    const hash = (ix: number, iz: number, k: number) => {
+      let h = (ix * 374761393 + iz * 668265263 + k * 2147483647 + map.seed * 69069) | 0;
+      h = (h ^ (h >>> 13)) * 1274126177;
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
     };
-    const colorAt = (x: number, z: number): [number, number, number] => {
-      // blend the four surrounding cells for soft biome borders
-      const fx = x / CELL - 0.5;
-      const fz = z / CELL - 0.5;
-      const x0 = Math.floor(fx);
-      const z0 = Math.floor(fz);
-      const tx = fx - x0;
-      const tz = fz - z0;
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      for (let dz = 0; dz <= 1; dz++) {
-        for (let dx = 0; dx <= 1; dx++) {
-          const cx = Math.min(GRID - 1, Math.max(0, x0 + dx));
-          const cz = Math.min(GRID - 1, Math.max(0, z0 + dz));
-          const w = (dx ? tx : 1 - tx) * (dz ? tz : 1 - tz);
-          const t = map.terrain[cz * GRID + cx];
-          let c = typeColor(t);
-          if (t === 0) {
-            const k = fbm(x * 0.05, z * 0.05, map.seed + 41, 3);
-            c = [
-              theme.grass[0] + (theme.grass2[0] - theme.grass[0]) * k,
-              theme.grass[1] + (theme.grass2[1] - theme.grass[1]) * k,
-              theme.grass[2] + (theme.grass2[2] - theme.grass[2]) * k,
-            ];
-          }
-          r += c[0] * w;
-          g += c[1] * w;
-          b += c[2] * w;
-        }
+    const gx = new Float32Array(verts * verts);
+    const gy = new Float32Array(verts * verts);
+    const gz = new Float32Array(verts * verts);
+    for (let iz = 0; iz < verts; iz++) {
+      for (let ix = 0; ix < verts; ix++) {
+        const i = iz * verts + ix;
+        const edge = ix === 0 || iz === 0 || ix === n || iz === n;
+        const x = (ix - SKIRT) * STEP + (edge ? 0 : (hash(ix, iz, 1) - 0.5) * 1.1);
+        const z = (iz - SKIRT) * STEP + (edge ? 0 : (hash(ix, iz, 2) - 0.5) * 1.1);
+        gx[i] = x;
+        gz[i] = z;
+        // outside the map the land rolls away into low hills
+        const out = Math.max(0, -x, -z, x - WORLD, z - WORLD);
+        gy[i] = map.height(Math.min(WORLD, Math.max(0, x)), Math.min(WORLD, Math.max(0, z))) + (out > 0 ? fbm(x * 0.045, z * 0.045, map.seed + 77, 3) * Math.min(1, out / 14) * 5 : 0);
       }
-      const h = map.height(x, z);
+    }
+
+    const sampleColor = (x: number, z: number, h: number): [number, number, number] => {
+      const cx = Math.min(WORLD - 0.01, Math.max(0, x));
+      const cz = Math.min(WORLD - 0.01, Math.max(0, z));
+      const t = map.terrainAt(cx, cz);
+      let r: number;
+      let g: number;
+      let b: number;
+      if (t === T_GRASS) {
+        // broad patches of the two grass tones, like mown and wild ground
+        const k = Math.min(1, Math.max(0, (fbm(x * 0.045, z * 0.045, map.seed + 41, 3) - 0.3) * 2.4));
+        r = theme.grass[0] + (theme.grass2[0] - theme.grass[0]) * k;
+        g = theme.grass[1] + (theme.grass2[1] - theme.grass[1]) * k;
+        b = theme.grass[2] + (theme.grass2[2] - theme.grass[2]) * k;
+      } else {
+        const c = t === T_DIRT ? theme.dirt : t === T_ROCK ? theme.rock : t === T_WATER ? theme.shore : theme.forest;
+        r = c[0];
+        g = c[1];
+        b = c[2];
+      }
       // cliffs go to bare rock, lake beds darken
       const rk = Math.min(1, Math.max(0, (h - 0.9) / 1.2));
       r += (theme.rock[0] - r) * rk;
       g += (theme.rock[1] - g) * rk;
       b += (theme.rock[2] - b) * rk;
-      const wet = Math.min(1, Math.max(0, (-h - 0.35) / 1.2));
-      r *= 1 - wet * 0.45;
-      g *= 1 - wet * 0.35;
+      const wet = Math.min(1, Math.max(0, (-h - 0.3) / 1.2));
+      r *= 1 - wet * 0.5;
+      g *= 1 - wet * 0.38;
       b *= 1 - wet * 0.25;
-      const noise = 0.82 + fbm(x * 0.55, z * 0.55, map.seed + 5, 2) * 0.36;
-      return [r * noise, g * noise, b * noise];
+      return [r, g, b];
     };
 
-    for (let iz = 0; iz < verts; iz++) {
-      for (let ix = 0; ix < verts; ix++) {
-        const i = iz * verts + ix;
-        const x = ix;
-        const z = iz;
-        positions[i * 3] = x;
-        positions[i * 3 + 1] = map.height(x, z);
-        positions[i * 3 + 2] = z;
-        const c = colorAt(x, z);
-        colors[i * 4] = c[0];
-        colors[i * 4 + 1] = c[1];
-        colors[i * 4 + 2] = c[2];
-        colors[i * 4 + 3] = 1;
-        uvs[i * 2] = x / 9;
-        uvs[i * 2 + 1] = z / 9;
+    const tris = n * n * 2;
+    const positions = new Float32Array(tris * 9);
+    const normals = new Float32Array(tris * 9);
+    const colors = new Float32Array(tris * 12);
+    const indices = new Uint32Array(tris * 3);
+    let tv = 0; // vertex cursor
+    const tri = (a: number, b: number, c: number, seed: number) => {
+      const ax = gx[a], ay = gy[a], az = gz[a];
+      const bx = gx[b], by = gy[b], bz = gz[b];
+      const cx = gx[c], cy = gy[c], cz = gz[c];
+      // face normal (ordered so it points up)
+      let nx = (by - ay) * (cz - az) - (bz - az) * (cy - ay);
+      let ny = (bz - az) * (cx - ax) - (bx - ax) * (cz - az);
+      let nz = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      nx /= nl;
+      ny /= nl;
+      nz /= nl;
+      // colour: average of three interior samples so biome borders get one in-between facet
+      const mx = (ax + bx + cx) / 3;
+      const my = (ay + by + cy) / 3;
+      const mz = (az + bz + cz) / 3;
+      let r = 0;
+      let g = 0;
+      let bl = 0;
+      for (const [px, pz] of [[ax, az], [bx, bz], [cx, cz]] as const) {
+        const col = sampleColor(px + (mx - px) * 0.45, pz + (mz - pz) * 0.45, my);
+        r += col[0] / 3;
+        g += col[1] / 3;
+        bl += col[2] / 3;
       }
-    }
-    let k = 0;
+      // per-facet tone variation is what gives the ground its low-poly sparkle
+      const tone = 0.9 + hash(a, seed, 3) * 0.2;
+      const steep = 1 - Math.min(0.45, (1 - Math.abs(ny)) * 1.6);
+      const out = Math.max(0, -mx, -mz, mx - WORLD, mz - WORLD);
+      const dim = tone * steep * (out > 0 ? Math.max(0.5, 1 - out / 40) : 1);
+      const flip = ny < 0;
+      const order = flip ? [a, c, b] : [a, b, c];
+      for (const v of order) {
+        positions[tv * 3] = gx[v];
+        positions[tv * 3 + 1] = gy[v];
+        positions[tv * 3 + 2] = gz[v];
+        normals[tv * 3] = flip ? -nx : nx;
+        normals[tv * 3 + 1] = Math.abs(ny);
+        normals[tv * 3 + 2] = flip ? -nz : nz;
+        colors[tv * 4] = r * dim;
+        colors[tv * 4 + 1] = g * dim;
+        colors[tv * 4 + 2] = bl * dim;
+        colors[tv * 4 + 3] = 1;
+        indices[tv] = tv;
+        tv++;
+      }
+    };
     for (let iz = 0; iz < n; iz++) {
       for (let ix = 0; ix < n; ix++) {
         const a = iz * verts + ix;
         const b = a + 1;
         const c = a + verts;
         const d = c + 1;
-        indices[k++] = a;
-        indices[k++] = c;
-        indices[k++] = b;
-        indices[k++] = b;
-        indices[k++] = c;
-        indices[k++] = d;
+        // alternate the diagonal so the facets do not line up into stripes
+        if ((ix + iz) & 1) {
+          tri(a, c, b, 0);
+          tri(b, c, d, 1);
+        } else {
+          tri(a, c, d, 0);
+          tri(a, d, b, 1);
+        }
       }
-    }
-    const normals = new Float32Array(positions.length);
-    VertexData.ComputeNormals(positions, indices, normals);
-    if (normals[1] < 0) {
-      // winding was back-facing for this engine convention: flip every triangle
-      for (let i = 0; i < indices.length; i += 3) {
-        const tmp = indices[i + 1];
-        indices[i + 1] = indices[i + 2];
-        indices[i + 2] = tmp;
-      }
-      VertexData.ComputeNormals(positions, indices, normals);
     }
     const vd = new VertexData();
     vd.positions = positions;
     vd.indices = indices;
     vd.normals = normals;
     vd.colors = colors;
-    vd.uvs = uvs;
     this.ground = new Mesh('ground', scene);
     vd.applyToMesh(this.ground);
+    // Babylon culls by winding: make sure the top side is the visible one
     this.ground.receiveShadows = true;
     this.ground.isPickable = false;
     this.ground.freezeWorldMatrix();
-
-    // Subtle tiling detail so large flat areas do not look like plain gradients.
-    const detail = new DynamicTexture('groundDetail', { width: 256, height: 256 }, scene, true);
-    const ctx = detail.getContext() as unknown as CanvasRenderingContext2D;
-    ctx.fillStyle = '#eeeeee';
-    ctx.fillRect(0, 0, 256, 256);
-    let seed = 12345;
-    const rnd = () => {
-      seed = (seed * 1664525 + 1013904223) >>> 0;
-      return seed / 4294967296;
-    };
-    for (let i = 0; i < 5200; i++) {
-      const dark = rnd() < 0.55;
-      const v = dark ? 150 + Math.floor(rnd() * 60) : 235 + Math.floor(rnd() * 20);
-      ctx.fillStyle = `rgba(${v},${v},${v},${0.2 + rnd() * 0.45})`;
-      const sz = 1 + rnd() * 3.2;
-      ctx.fillRect(rnd() * 256, rnd() * 256, sz, sz * (0.6 + rnd()));
-    }
-    for (let i = 0; i < 160; i++) {
-      // little tufts / cracks
-      ctx.strokeStyle = `rgba(110,110,110,${0.12 + rnd() * 0.22})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      const x = rnd() * 256;
-      const y = rnd() * 256;
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + (rnd() - 0.5) * 9, y - 3 - rnd() * 7);
-      ctx.stroke();
-    }
-    detail.update();
     const gm = new StandardMaterial('groundMat', scene);
-    gm.diffuseTexture = detail;
-    gm.specularColor = new Color3(0.03, 0.03, 0.03);
+    gm.specularColor = new Color3(0.02, 0.02, 0.02);
+    gm.backFaceCulling = false;
     this.ground.material = gm;
 
     // Water sheet.
-    this.water = MeshBuilder.CreateGround('water', { width: WORLD, height: WORLD }, scene);
+    this.water = MeshBuilder.CreateGround('water', { width: WORLD + 104, height: WORLD + 104 }, scene);
     this.water.position.set(WORLD / 2, -0.55, WORLD / 2);
     const wm = new StandardMaterial('waterMat', scene);
     wm.diffuseColor = new Color3(theme.water[0], theme.water[1], theme.water[2]);
@@ -223,23 +221,42 @@ export class TerrainView {
     this.water.alphaIndex = 0;
     this.water.freezeWorldMatrix();
 
-    // Props.
-    const rocks = [0, 1, 2].map((v) => new Batch(buildRockModel(scene, v, theme.rock), 256));
-    const trees = [0, 1].map((v) => new Batch(buildTreeModel(scene, v, v === 0 ? theme.leaf : theme.leaf2, theme.trunk, theme.snow), 512));
-    const bush = new Batch(buildBushModel(scene, theme.leaf2), 256);
-    for (const b of [...rocks, ...trees, bush]) {
+    // Props: Blender-built scenery, recoloured for this battlefield through palette slots.
+    const mix = (p: Col, q: Col, t: number): Col => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
+    const snow: Col = [0.9, 0.94, 1.0];
+    const foliage = {
+      leaf: theme.leaf,
+      leaf2: theme.leaf2,
+      trunk: theme.trunk,
+      cap: theme.snow ? snow : mix(theme.leaf2, [1, 0.95, 0.5], 0.22),
+    };
+    const stone = {
+      rock: theme.rock,
+      rock2: mix(theme.rock, [0, 0, 0], 0.22),
+      cap: theme.snow ? snow : mix(theme.rock, theme.grass, 0.55),
+    };
+    const make = (name: string, overrides: Record<string, Col>, cap: number) => {
+      const b = new Batch(buildModel(scene, pack, name, 0, overrides).body, cap);
       b.mesh.material = objectMaterial;
       b.mesh.receiveShadows = true;
       b.begin();
-    }
+      return b;
+    };
+    const rocks = ['rock0', 'rock1', 'rock2'].map((n) => make(n, stone, 256));
+    const trees = ['tree0', 'tree1', 'tree2'].map((n) => make(n, foliage, 512));
+    const bush = make('bush', foliage, 256);
+    const frac = (v: number) => v - Math.floor(v);
     for (const p of map.props) {
       const y = map.height(p.x, p.z);
       if (p.type === 'rock') {
-        const tint = 0.85 + ((p.rot * 7) % 1) * 0.3;
-        rocks[p.variant % 3].push(p.x, y - 0.15, p.z, p.rot, p.scale, p.scale * (0.8 + ((p.rot * 3) % 1) * 0.5), p.scale, tint, tint, tint);
+        const tint = 0.88 + frac(p.rot * 7) * 0.24;
+        rocks[p.variant % 3].push(p.x, y - 0.12, p.z, p.rot, p.scale, p.scale * (0.85 + frac(p.rot * 3) * 0.4), p.scale, tint, tint, tint);
       } else if (p.type === 'tree') {
-        const tint = 0.8 + ((p.rot * 5) % 1) * 0.4;
-        trees[p.variant % 2].push(p.x, y - 0.1, p.z, p.rot, p.scale, p.scale * (0.9 + ((p.rot * 11) % 1) * 0.35), p.scale, tint, tint, tint);
+        const tint = 0.84 + frac(p.rot * 5) * 0.32;
+        // conifers come in two shapes; broadleaf trees fill in the rest
+        const kind = p.variant % 2 === 1 ? 1 : frac(p.rot * 13) < 0.4 ? 2 : 0;
+        const s = p.scale * (kind === 1 ? 0.95 : 0.9);
+        trees[kind].push(p.x, y - 0.1, p.z, p.rot, s, s * (0.9 + frac(p.rot * 11) * 0.3), s, tint, tint, tint);
       } else {
         bush.push(p.x, y - 0.05, p.z, p.rot, p.scale, p.scale, p.scale);
       }

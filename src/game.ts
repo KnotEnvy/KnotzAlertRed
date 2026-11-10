@@ -7,7 +7,8 @@ import { BUILDING_DEFS } from './data/buildings';
 import { HERO_DEFS } from './data/heroes';
 import { UNIT_DEFS } from './data/units';
 import { Input } from './input/input';
-import { renderIcons } from './render/icons';
+import { portraitUrls, preloadPortraits } from './render/icons';
+import { loadModelPack } from './render/modelpack';
 import { Overlay } from './render/overlay';
 import { Renderer } from './render/renderer';
 import type { Hooks, NoticeKind, Rgb } from './sim/hooks';
@@ -69,9 +70,12 @@ export class Game {
   }
 
   async init(onProgress: (text: string, f: number) => void): Promise<void> {
-    onProgress('Generating battlefield…', 0.1);
+    onProgress('Unpacking the armoury…', 0.05);
+    const pack = await loadModelPack();
+    if (this.disposed) return;
+    onProgress('Generating battlefield…', 0.15);
     await nextFrame();
-    this.renderer = new Renderer(this.canvas, this.world, this.config.theme);
+    this.renderer = new Renderer(this.canvas, this.world, this.config.theme, pack);
     this.renderer.setQuality(this.settings.shadows, this.settings.bloom);
     this.overlay = new Overlay(this.overlayCanvas);
     onProgress('Assembling war machines…', 0.3);
@@ -80,10 +84,10 @@ export class Game {
     this.renderer.warmup(unitModels, Object.values(BUILDING_DEFS).filter((d) => d.category !== 'neutral').map((d) => d.model));
     this.renderer.centerOnStart();
 
-    // The render loop must be running for the icon studio's render targets to resolve.
     this.renderer.engine.runRenderLoop(() => this.frame());
-    onProgress('Rendering unit portraits…', 0.45);
-    this.icons = await renderIcons(this.renderer, (f) => onProgress('Rendering unit portraits…', 0.45 + f * 0.5));
+    onProgress('Briefing the commander…', 0.7);
+    this.icons = portraitUrls();
+    await preloadPortraits(this.icons);
     if (this.disposed) return;
 
     this.input = new Input(

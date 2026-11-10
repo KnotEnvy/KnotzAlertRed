@@ -108,7 +108,7 @@ export class Screens {
       art.style.backgroundImage = `url(${img.src})`;
       art.classList.add('loaded');
     };
-    img.src = `${import.meta.env.BASE_URL}art/keyart.png`;
+    img.src = `${import.meta.env.BASE_URL}art/keyart.webp`;
     menu.appendChild(art);
     menu.appendChild(el('div', 'menu-shade'));
 
