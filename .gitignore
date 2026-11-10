@@ -1,0 +1,10 @@
+node_modules
+dist
+*.log
+.DS_Store
+.vite
+scripts/out
+scripts/verify/hud
+scripts/verify/input
+scripts/verify/combat
+scripts/verify/shots

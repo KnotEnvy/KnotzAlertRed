@@ -1,0 +1,25 @@
+{
+  "name": "knotz-alert-red",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "KnotZ: Alert Red — a 3D browser RTS built with Vite, TypeScript and Babylon.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "simtest": "node scripts/simtest.mjs",
+    "movetest": "node scripts/movetest.mjs",
+    "verify": "node scripts/verify/input.mjs && node scripts/verify/hud.mjs && node scripts/verify/combat.mjs"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^9.35.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.7"
+  }
+}
